@@ -9,8 +9,14 @@ import { Footer } from '../components/Footer';
 
 export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView }: { onBack: () => void, onEnterTournament: () => void, view: any, setView: (v: any) => void }) => {
   const [studentNumber, setStudentNumber] = useState('');
-  const [verifying, setVerifying] = useState(false);
-  const [selectedArchetype, setSelectedArchetype] = useState('30 – 40 KİŞİ');
+  const [verifyingStudent, setVerifyingStudent] = useState(false);
+  const [studentVerified, setStudentVerified] = useState(false);
+  const [studentError, setStudentError] = useState('');
+
+  const [codename, setCodename] = useState('');
+  const [verifyingCodename, setVerifyingCodename] = useState(false);
+  const [codenameStatus, setCodenameStatus] = useState<'idle' | 'scanning' | 'approved' | 'rejected'>('idle');
+  const [codenameError, setCodenameError] = useState('');
 
   const archetypes = [
     { name: '4 – 10 KİŞİ', icon: Users, desc: 'Sistem: Round Robin. Yapı: Herkes herkese. Toplam Maç: 6 – 45.', img: 'https://images.unsplash.com/photo-1544197150-b99a580bb7a8?auto=format&fit=crop&q=80&w=800' },
@@ -20,9 +26,61 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
     { name: '50+ KİŞİ', icon: Shield, desc: 'Sistem: Single Elimination. Yapı: Direkt eleme. Toplam Maç: ≤ n-1.', img: 'https://images.unsplash.com/photo-1531297484001-80022131f5a1?auto=format&fit=crop&q=80&w=800' }
   ];
 
-  const handleVerify = () => {
-    setVerifying(true);
-    setTimeout(() => setVerifying(false), 2000);
+  const handleVerifyStudent = () => {
+    const isValid = /^\d{9}$/.test(studentNumber);
+    if (!isValid) {
+      setStudentError("Eksik veya fazla tuşladınız. Numara tam 9 haneli olmalıdır.");
+      setStudentVerified(false);
+      return;
+    }
+
+    setStudentError('');
+    setVerifyingStudent(true);
+    setTimeout(() => {
+      setVerifyingStudent(false);
+      setStudentVerified(true);
+    }, 1500);
+  };
+
+  const handleVerifyCodename = async () => {
+    if (!codename) return;
+    
+    // Local filter optimization
+    if (codename.length < 3) {
+      setCodenameStatus('rejected');
+      setCodenameError('Takma ad en az 3 karakter olmalıdır.');
+      return;
+    }
+    if (/^\d+$/.test(codename)) {
+      setCodenameStatus('rejected');
+      setCodenameError('Takma ad sadece rakamlardan oluşamaz.');
+      return;
+    }
+
+    setCodenameStatus('scanning');
+    setVerifyingCodename(true);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/verify-codename', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codename })
+      });
+      
+      const data = await response.json();
+      
+      if (data.valid) {
+        setCodenameStatus('approved');
+      } else {
+        setCodenameStatus('rejected');
+        setCodenameError(data.reason || "Bilinmeyen bir hata oluştu.");
+      }
+    } catch (e) {
+      setCodenameStatus('rejected');
+      setCodenameError('Sistem şu an meşgul.');
+    } finally {
+      setVerifyingCodename(false);
+    }
   };
 
   return (
@@ -65,19 +123,24 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
                 <input 
                   type="text"
                   value={studentNumber}
-                  onChange={(e) => setStudentNumber(e.target.value)}
-                  className="w-full bg-surface-container-high border border-outline-variant focus:border-primary focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-outline-variant/30"
+                  onChange={(e) => {
+                    setStudentNumber(e.target.value);
+                    setStudentError('');
+                    setStudentVerified(false);
+                  }}
+                  className={`w-full bg-surface-container-high border ${studentError ? 'border-red-500' : 'border-outline-variant focus:border-primary'} focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-outline-variant/30`}
                   placeholder="2X0201XXX"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-6 bg-primary/20 animate-pulse"></span>
               </div>
+              {studentError && <p className="text-red-500 text-[10px] font-bold font-mono uppercase">{studentError}</p>}
               <button 
-                onClick={handleVerify}
-                disabled={verifying}
+                onClick={handleVerifyStudent}
+                disabled={verifyingStudent || studentVerified}
                 className="w-full bg-primary text-on-primary font-display font-bold py-5 uppercase flex items-center justify-center gap-4 hover:shadow-[0_0_20px_rgba(74,225,118,0.3)] transition-all active:scale-[0.98] disabled:opacity-50"
               >
-                {verifying ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldIcon className="w-5 h-5" />}
-                {verifying ? 'DOĞRULANIYOR...' : 'DOĞRULA'}
+                {verifyingStudent ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldIcon className="w-5 h-5" />}
+                {verifyingStudent ? 'DOĞRULANIYOR...' : (studentVerified ? 'ONAYLANDI' : 'DOĞRULA')}
               </button>
             </div>
           </motion.div>
@@ -112,21 +175,43 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
                   </div>
                 </div>
               </div>
-              <div className="relative">
+              <div className="relative flex gap-4">
                 <input 
                   type="text"
-                  defaultValue="GHOST_PROTOCOL"
-                  className="w-full bg-surface-container-high border border-primary/30 focus:border-primary focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all"
+                  value={codename}
+                  onChange={(e) => {
+                    setCodename(e.target.value);
+                    setCodenameStatus('idle');
+                  }}
+                  className="w-full bg-surface-container-high border border-primary/30 focus:border-primary focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-primary/30"
+                  placeholder="GHOST_PROTOCOL"
                 />
+                <button 
+                  onClick={handleVerifyCodename}
+                  disabled={verifyingCodename || !codename}
+                  className="px-6 bg-primary text-on-primary font-display font-bold uppercase hover:shadow-[0_0_20px_rgba(74,225,118,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center min-w-[120px]"
+                >
+                  {verifyingCodename ? <Loader2 className="w-5 h-5 animate-spin" /> : 'TARAMA'}
+                </button>
               </div>
-              <div className="flex items-center gap-4 p-4 bg-primary/5 border border-primary/20">
-                <ShieldIcon className="w-6 h-6 text-primary animate-pulse" />
-                <div className="flex-grow">
-                  <div className="text-[10px] font-bold text-primary uppercase tracking-tighter">AI Anonymity Check</div>
-                  <div className="text-[10px] text-on-surface-variant/60 font-mono">SCANNING FOR PII DATA... NO MATCHES FOUND.</div>
+              
+              {codenameStatus !== 'idle' && (
+                <div className={`flex items-center gap-4 p-4 border ${codenameStatus === 'rejected' ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'}`}>
+                  <ShieldIcon className={`w-6 h-6 ${codenameStatus === 'scanning' ? 'animate-pulse' : ''} ${codenameStatus === 'rejected' ? 'text-red-500' : 'text-primary'}`} />
+                  <div className="flex-grow">
+                    <div className={`text-[10px] font-bold uppercase tracking-tighter ${codenameStatus === 'rejected' ? 'text-red-500' : 'text-primary'}`}>
+                      AI Anonymity Check
+                    </div>
+                    <div className="text-[10px] text-on-surface-variant/60 font-mono mt-1">
+                      {codenameStatus === 'scanning' && 'SCANNING FOR PII DATA...'}
+                      {codenameStatus === 'approved' && 'NO PII DETECTED. SAFE.'}
+                      {codenameStatus === 'rejected' && <span className="text-red-400">{codenameError}</span>}
+                    </div>
+                  </div>
+                  {codenameStatus === 'approved' && <div className="bg-primary text-on-primary text-[10px] font-bold px-2 py-1 uppercase">ONAYLANDI</div>}
+                  {codenameStatus === 'rejected' && <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-1 uppercase">REDDEDİLDİ</div>}
                 </div>
-              <div className="bg-primary text-on-primary text-[10px] font-bold px-2 py-1 uppercase">ONAYLANDI</div>
-              </div>
+              )}
             </div>
           </motion.div>
         </section>
@@ -139,7 +224,8 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
           >
             <button 
               onClick={onEnterTournament}
-              className="group relative w-full p-8 bg-black border-2 border-primary overflow-hidden transition-all hover:shadow-[0_0_40px_rgba(74,225,118,0.4)]"
+              disabled={!studentVerified || codenameStatus !== 'approved'}
+              className="group relative w-full p-8 bg-black border-2 border-primary overflow-hidden transition-all hover:shadow-[0_0_40px_rgba(74,225,118,0.4)] disabled:opacity-50 disabled:border-neutral-800 disabled:shadow-none"
             >
               <div className="absolute inset-0 bg-primary opacity-10 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
               <span className="relative z-10 font-display text-primary text-3xl uppercase tracking-[0.2em] flex items-center justify-center gap-6">
