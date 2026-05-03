@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "Space Grotesk", monospace; /* Using Space Grotesk for terminal feel too */
+
+  --color-primary: #4be277;
+  --color-primary-container: #22c55e;
+  --color-surface-container-lowest: #0e0e0e;
+  --color-surface-container-low: #1c1b1b;
+  --color-surface-container-high: #2a2a2a;
+  --color-outline-variant: #3d4a3d;
+  --color-on-surface: #e5e2e1;
+  --color-on-surface-variant: #bccbb9;
+  --color-tertiary: #50dfa4;
+
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+}
+
+@layer utilities {
+  .glow-text {
+    text-shadow: 0 0 20px rgba(74, 225, 118, 0.5), 0 0 40px rgba(74, 225, 118, 0.2);
+  }
+  
+  .glass-panel {
+    background: rgba(28, 27, 27, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(74, 225, 118, 0.1);
+  }
+
+  .vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+  }
+
+  .scanline {
+    width: 100%;
+    height: 2px;
+    background: rgba(74, 225, 118, 0.2);
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 50;
+    animation: scan 4s linear infinite;
+  }
+}
+
+body {
+  @apply bg-surface-container-lowest text-on-surface font-sans;
+}
+
+h1, h2, h3, h4, .font-display {
+  @apply font-display;
+}
+
