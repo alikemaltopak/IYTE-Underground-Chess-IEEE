@@ -1,20 +1,39 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 🚀 Proje Başlığı (Örn: EduConnect / StudentAuth ML)
 
-# Run and deploy your AI Studio app
+Bu proje, öğrenci kimlik doğrulama süreçlerini makine öğrenmesi ile optimize eden ve güvenli bir kullanıcı deneyimi sunan kapsamlı bir web uygulamasıdır. 
 
-This contains everything you need to run your app locally.
+## 🛠️ Kullanılan Teknolojiler
+*   **Frontend:** React / Next.js
+*   **Backend:** Node.js / Python
+*   **Database:** PostgreSQL / MongoDB
+*   **ML:** Scikit-learn / TensorFlow
+*   **Auth:** Google OAuth 2.0
 
-View your app in AI Studio: https://ai.studio/apps/abc67d30-a206-42fc-ac29-cbbcb241d87c
+---
 
-## Run Locally
+## 📌 Yapılacaklar Listesi (Roadmap)
 
-**Prerequisites:**  Node.js
+Projenin geliştirme sürecindeki ana hedefler aşağıda aşamalandırılmıştır:
 
+### 1. Kimlik Doğrulama ve Kullanıcı Yönetimi
+- [ ] **Modern Login Sayfası Tasarımı:** Kullanıcı dostu ve responsive bir giriş arayüzü oluşturulması.
+- [ ] **Google ile Giriş (OAuth 2.0):** Kullanıcıların Google hesaplarıyla hızlı ve güvenli erişim sağlaması.
+- [ ] **Kullanıcı Kayıt Sistemi:** Yeni kullanıcıların sisteme dahil edilmesi için kayıt formlarının oluşturulması.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### 2. Veritabanı ve Veri Yönetimi
+- [ ] **Veritabanı Şeması Tasarımı:** Kullanıcı profilleri, öğrenci bilgileri ve loglar için yapılandırma.
+- [ ] **Veritabanı Entegrasyonu:** CRUD operasyonlarının backend ile bağlanması.
+- [ ] **Student ID Doğrulama:** Öğrenci numaralarının format ve geçerlilik kontrolleri.
+
+### 3. Makine Öğrenmesi (ML) Entegrasyonu
+- [ ] **Username & Student ID Analiz Modeli:** Kullanıcı adları veya öğrenci kimlikleri üzerinden anomali tespiti yapacak ML modelinin geliştirilmesi.
+- [ ] **Model API Entegrasyonu:** Eğitilen modelin gerçek zamanlı tahmin yürütmesi.
+- [ ] **Veri Seti Hazırlığı:** Modelin eğitimi için anonimleştirilmiş öğrenci verilerinin düzenlenmesi.
+
+---
+
+## ⚙️ Kurulum
+
+1. **Repoyu Klonlayın:**
+   ```bash
+   git clone [https://github.com/kullaniciadi/proje-adi.git](https://github.com/kullaniciadi/proje-adi.git)
