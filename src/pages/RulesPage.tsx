@@ -49,6 +49,7 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
               <p><span className="text-primary">[KURAL 02]: 48S UPLINK</span> — Müsabaka koordinatları ve kesin zaman dilimi, başlangıçtan 48 saat önce güvenli kanal üzerinden iletilecektir.</p>
               <p><span className="text-primary">[KURAL 03]: BLITZ CONSTRAINTS</span> — Tüm hamleler 5 dakikalık kısıtlı zaman dilimi içerisinde tamamlanmalıdır.</p>
               <p><span className="text-primary">[KURAL 04]: MERIT REWARDS</span> — Operasyon sonunda ilk 3'e giren operatörler IEEE tarafından ödüllendirilecektir.</p>
+              <p><span className="text-primary">[KURAL 05]: DYNAMIC ARCHITECTURE</span> — Turnuva düzeni ve eşleşme sistemi (Swiss, Double Elimination vb.), katılan operatör sayısına göre sistem tarafından otomatik olarak belirlenecektir.</p>
               <div className="mt-6 p-4 border border-primary/10 bg-primary/5 rounded-sm">
                 <p className="text-[10px] text-primary/70 italic tracking-widest flex items-center gap-2">
                   <Sparkles className="w-4 h-4" /> "Yeraltında her hamle bir iz bırakır, ama sadece en hızlılar hayatta kalır."

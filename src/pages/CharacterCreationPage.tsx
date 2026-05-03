@@ -124,9 +124,14 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
                   type="text"
                   value={studentNumber}
                   onChange={(e) => {
-                    setStudentNumber(e.target.value);
-                    setStudentError('');
+                    const val = e.target.value;
+                    setStudentNumber(val);
                     setStudentVerified(false);
+                    if (/[^\d]/.test(val)) {
+                      setStudentError('ID karakter içeremez. Sadece rakam giriniz.');
+                    } else {
+                      setStudentError('');
+                    }
                   }}
                   className={`w-full bg-surface-container-high border ${studentError ? 'border-red-500' : 'border-outline-variant focus:border-primary'} focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-outline-variant/30`}
                   placeholder="2X0201XXX"
@@ -137,7 +142,11 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
               <button 
                 onClick={handleVerifyStudent}
                 disabled={verifyingStudent || studentVerified}
-                className="w-full bg-primary text-on-primary font-display font-bold py-5 uppercase flex items-center justify-center gap-4 hover:shadow-[0_0_20px_rgba(74,225,118,0.3)] transition-all active:scale-[0.98] disabled:opacity-50"
+                className={`w-full font-display font-bold py-5 uppercase flex items-center justify-center gap-4 transition-all active:scale-[0.98] ${
+                  studentVerified 
+                    ? 'bg-[#4ae176] text-black shadow-[0_0_40px_rgba(74,225,118,0.9)] border-2 border-white' 
+                    : 'bg-primary text-on-primary hover:shadow-[0_0_20px_rgba(74,225,118,0.3)]'
+                } ${verifyingStudent ? 'opacity-50' : ''}`}
               >
                 {verifyingStudent ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldIcon className="w-5 h-5" />}
                 {verifyingStudent ? 'DOĞRULANIYOR...' : (studentVerified ? 'ONAYLANDI' : 'DOĞRULA')}
@@ -188,7 +197,7 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
                 />
                 <button 
                   onClick={handleVerifyCodename}
-                  disabled={verifyingCodename || !codename}
+                  disabled={codenameStatus !== 'idle' || !codename}
                   className="px-6 bg-primary text-on-primary font-display font-bold uppercase hover:shadow-[0_0_20px_rgba(74,225,118,0.3)] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center min-w-[120px]"
                 >
                   {verifyingCodename ? <Loader2 className="w-5 h-5 animate-spin" /> : 'TARAMA'}
