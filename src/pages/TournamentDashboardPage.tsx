@@ -6,6 +6,8 @@ import {
   type LucideIcon
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
+import { subscribeToPlayers, PlayerData } from '../services/playerService';
+import { useState, useEffect } from 'react';
 
 // Archetype icon & color mapping — mirrors CharacterCreationPage
 const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
@@ -23,6 +25,17 @@ const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
 const ARCHETYPE_KEYS = Object.keys(ARCHETYPE_MAP);
 
 export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () => void, view: any, setView: (v: any) => void }) => {
+  const [players, setPlayers] = useState<PlayerData[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToPlayers((data) => {
+      setPlayers(data);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const playerCount = players.length;
+
   return (
     <div id="dashboard-top" className="min-h-screen bg-[#050505] text-on-surface font-sans cyber-grid selection:bg-primary/20 relative overflow-x-hidden pt-16">
       <div className="fixed inset-0 pointer-events-none opacity-20 scanline z-50"></div>
@@ -68,7 +81,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
             </div>
             <div className="relative z-10 mt-6 md:mt-0 text-right">
               <div className="flex items-baseline gap-2">
-                <span className="font-display text-7xl text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.6)]">42</span>
+                <span className="font-display text-7xl text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.6)]">{playerCount}</span>
                 <span className="text-2xl text-neutral-500 font-bold">/ 64</span>
               </div>
               <div className="flex items-center justify-end gap-2 text-primary text-[10px] font-bold tracking-widest">
@@ -127,7 +140,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               {/* Floating Counter Widget in Top Right */}
               <div className="hidden md:flex flex-col items-end">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-display text-primary drop-shadow-[0_0_10px_rgba(74,225,118,0.4)]">42</span>
+                  <span className="text-4xl font-display text-primary drop-shadow-[0_0_10px_rgba(74,225,118,0.4)]">{playerCount}</span>
                   <span className="text-xl text-neutral-600 font-bold italic">/ 64</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -248,7 +261,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               </div>
               <div className="flex flex-col items-end">
                 <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-display text-tertiary drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">24</span>
+                  <span className="text-4xl font-display text-tertiary drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">{playerCount}</span>
                   <span className="text-xl text-neutral-600 font-bold italic">/ 64</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
@@ -259,49 +272,26 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
             </div>
             
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {[
-                { name: "KRAKEN_99",           archetype: "CENTER CONTROL" },
-                { name: "SPECTRE_X",           archetype: "TACTICS" },
-                { name: "VOID_WALKER",         archetype: "SPACE ADVANTAGE" },
-                { name: "NEURAL_LINK",         archetype: "COORDINATION" },
-                { name: "QUANTUM_GATE",        archetype: "DEVELOPMENT" },
-                { name: "CYBER_WOLF",          archetype: "TACTICS" },
-                { name: "GHOST_DECODED",       archetype: "KING SAFETY" },
-                { name: "PHANTOM_STRATEGIST",  archetype: "PLAN MAKING" },
-                { name: "AXON_BYPASS",         archetype: "OPEN FILE CONTROL" },
-                { name: "ZERO_ONE",            archetype: "PAWN STRUCTURE" },
-                { name: "CORE_BREACH",         archetype: "TACTICS" },
-                { name: "SIGNAL_LOST",         archetype: "SPACE ADVANTAGE" },
-                { name: "ENIGMA_NODE",         archetype: "COORDINATION" },
-                { name: "VECTOR_KING",         archetype: "CENTER CONTROL" },
-                { name: "GRID_MASTER",         archetype: "PAWN STRUCTURE" },
-                { name: "DEEP_PURPLE",         archetype: "PLAN MAKING" },
-                { name: "STATIC_VOID",         archetype: "KING SAFETY" },
-                { name: "BLUR_NODE",           archetype: "DEVELOPMENT" },
-                { name: "ROOT_ACCESS",         archetype: "OPEN FILE CONTROL" },
-                { name: "BYTE_ME",             archetype: "TACTICS" },
-                { name: "OMEGA_ONE",           archetype: "CENTER CONTROL" },
-                { name: "ALPHA_STRETCH",       archetype: "SPACE ADVANTAGE" },
-                { name: "DARK_EYE",            archetype: "COORDINATION" },
-                { name: "SILENT_STEP",         archetype: "KING SAFETY" }
-              ].map((user, i) => {
-                const archData = ARCHETYPE_MAP[user.archetype];
+              {players.map((player, i) => {
+                const archData = ARCHETYPE_MAP[player.archetype];
                 const ArchIcon = archData?.icon;
                 const archColor = archData?.color || 'text-neutral-500';
                 return (
-                  <div key={i} className="bg-white/5 border border-white/5 p-3 flex items-center justify-between group hover:border-tertiary transition-all hover:bg-tertiary/5">
+                  <div key={player.uid || i} className="bg-white/5 border border-white/5 p-3 flex items-center justify-between group hover:border-tertiary transition-all hover:bg-tertiary/5">
                     <div className="flex items-center gap-2.5">
                        {ArchIcon && <ArchIcon className={`w-3.5 h-3.5 ${archColor} shrink-0 transition-all group-hover:drop-shadow-[0_0_6px_currentColor]`} />}
-                       <span className="font-mono text-[9px] font-bold text-neutral-500 group-hover:text-tertiary tracking-[0.15em]">{user.name}</span>
+                       <span className="font-mono text-[9px] font-bold text-neutral-500 group-hover:text-tertiary tracking-[0.15em]">{player.codename}</span>
                     </div>
                     <CheckCircle2 className="w-3 h-3 text-neutral-800 group-hover:text-tertiary transition-colors" />
                   </div>
                 );
               })}
-              <div className="bg-tertiary/10 border border-tertiary/30 p-3 flex flex-col items-center justify-center border-dashed border-2 group hover:bg-tertiary/20 transition-all cursor-pointer">
-                <span className="font-mono text-[8px] text-tertiary font-bold tracking-widest mb-1 italic">MORE_RECORDS</span>
-                <ChevronRight className="w-3 h-3 text-tertiary group-hover:translate-x-1 transition-transform" />
-              </div>
+              {players.length === 0 && (
+                <div className="col-span-full text-center py-8">
+                  <p className="text-[10px] text-neutral-600 font-mono tracking-widest uppercase">Henüz kayıtlı operatör yok...</p>
+                  <p className="text-[8px] text-neutral-700 font-mono tracking-widest mt-1">AWAITING_FIRST_SIGNAL</p>
+                </div>
+              )}
             </div>
           </motion.section>
         </main>

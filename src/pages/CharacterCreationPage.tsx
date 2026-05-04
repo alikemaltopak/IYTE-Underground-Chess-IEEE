@@ -6,8 +6,11 @@ import {
 import { useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { useAuth } from '../context/AuthContext';
+import { savePlayer } from '../services/playerService';
 
 export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView }: { onBack: () => void, onEnterTournament: () => void, view: any, setView: (v: any) => void }) => {
+  const { user } = useAuth();
   const [studentNumber, setStudentNumber] = useState('');
   const [verifyingStudent, setVerifyingStudent] = useState(false);
   const [studentVerified, setStudentVerified] = useState(false);
@@ -18,7 +21,26 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
   const [codenameStatus, setCodenameStatus] = useState<'idle' | 'scanning' | 'approved' | 'rejected'>('idle');
   const [codenameError, setCodenameError] = useState('');
 
-  const [selectedArchetype, setSelectedArchetype] = useState('QUEEN');
+  const [selectedArchetype, setSelectedArchetype] = useState('CENTER CONTROL');
+  const [saving, setSaving] = useState(false);
+
+  const handleJoinTournament = async () => {
+    if (!user) return;
+    setSaving(true);
+    try {
+      await savePlayer(user.uid, {
+        codename,
+        studentId: studentNumber,
+        archetype: selectedArchetype,
+        email: user.email || ''
+      });
+      onEnterTournament();
+    } catch (err) {
+      console.error('Kayıt hatası:', err);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const archetypes = [
     { name: 'CENTER CONTROL', icon: Target, color: 'text-emerald-400', borderColor: 'border-emerald-800', desc: 'Merkezi ele geçir, oyunu sen yönlendir. Taşlarının hareket alanını artırırken rakibin seçeneklerini kısıtla. Oyunun temposunu belirleyen temel güç.', img: '/archetype_queen_1777845711451.png' },
@@ -296,17 +318,17 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
             className="w-full max-w-xl mx-auto mt-12"
           >
             <button 
-              onClick={onEnterTournament}
-              disabled={!studentVerified || codenameStatus !== 'approved'}
+              onClick={handleJoinTournament}
+              disabled={!studentVerified || codenameStatus !== 'approved' || saving}
               className="group relative w-full p-8 bg-black border-2 border-primary overflow-hidden transition-all hover:shadow-[0_0_40px_rgba(74,225,118,0.4)] disabled:opacity-50 disabled:border-neutral-800 disabled:shadow-none"
             >
               <div className="absolute inset-0 bg-primary opacity-10 translate-y-full group-hover:translate-y-0 transition-transform duration-500"></div>
               <span className="relative z-10 font-display text-primary text-3xl uppercase tracking-[0.2em] flex items-center justify-center gap-6">
-                TURNUVAYI BAŞLAT
-                <LogIn className="w-8 h-8" />
+                {saving ? <Loader2 className="w-8 h-8 animate-spin" /> : <LogIn className="w-8 h-8" />}
+                {saving ? 'KAYDEDİLİYOR...' : 'TURNUVAYA KATIL'}
               </span>
               <div className="mt-4 text-[10px] text-primary/40 uppercase tracking-widest relative z-10 font-bold">
-                [ Encryption sequence ready. Click to finalize profile ]
+                {saving ? '[ Writing to secure database... ]' : '[ Encryption sequence ready. Click to finalize profile ]'}
               </div>
             </button>
           </motion.div>
