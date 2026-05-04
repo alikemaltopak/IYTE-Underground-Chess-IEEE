@@ -1,9 +1,26 @@
 import { motion } from 'motion/react';
 import { 
   Activity, GitBranch, Database, Sparkles, 
-  LayoutGrid, Bot, FileDown, CheckCircle2, ChevronRight, AlertCircle 
+  LayoutGrid, Bot, FileDown, CheckCircle2, ChevronRight, AlertCircle,
+  Target, Zap, Shield, Grid3X3, AlignVerticalSpaceAround, Sword, Network, Expand, BrainCircuit,
+  type LucideIcon
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
+
+// Archetype icon & color mapping — mirrors CharacterCreationPage
+const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
+  'CENTER CONTROL':    { icon: Target,                    color: 'text-emerald-400' },
+  'DEVELOPMENT':       { icon: Zap,                       color: 'text-yellow-400' },
+  'KING SAFETY':       { icon: Shield,                    color: 'text-blue-400' },
+  'PAWN STRUCTURE':    { icon: Grid3X3,                   color: 'text-green-500' },
+  'OPEN FILE CONTROL': { icon: AlignVerticalSpaceAround,  color: 'text-cyan-400' },
+  'TACTICS':           { icon: Sword,                     color: 'text-red-500' },
+  'COORDINATION':      { icon: Network,                   color: 'text-indigo-400' },
+  'SPACE ADVANTAGE':   { icon: Expand,                    color: 'text-purple-500' },
+  'PLAN MAKING':       { icon: BrainCircuit,              color: 'text-primary' },
+};
+
+const ARCHETYPE_KEYS = Object.keys(ARCHETYPE_MAP);
 
 export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () => void, view: any, setView: (v: any) => void }) => {
   return (
@@ -243,20 +260,44 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
             
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {[
-                "KRAKEN_99", "SPECTRE_X", "VOID_WALKER", "NEURAL_LINK", "QUANTUM_GATE",
-                "CYBER_WOLF", "GHOST_DECODED", "PHANTOM_STRATEGIST", "AXON_BYPASS", "ZERO_ONE",
-                "CORE_BREACH", "SIGNAL_LOST", "ENIGMA_NODE", "VECTOR_KING", "GRID_MASTER",
-                "DEEP_PURPLE", "STATIC_VOID", "BLUR_NODE", "ROOT_ACCESS", "BYTE_ME",
-                "OMEGA_ONE", "ALPHA_STRETCH", "DARK_EYE", "SILENT_STEP"
-              ].map((user, i) => (
-                <div key={i} className="bg-white/5 border border-white/5 p-3 flex items-center justify-between group hover:border-tertiary transition-all hover:bg-tertiary/5">
-                  <div className="flex items-center gap-3">
-                     <div className="w-1.5 h-1.5 rounded-full bg-neutral-700 group-hover:bg-tertiary group-hover:shadow-[0_0_8px_#a855f7] transition-all"></div>
-                     <span className="font-mono text-[9px] font-bold text-neutral-500 group-hover:text-tertiary tracking-[0.15em]">{user}</span>
+                { name: "KRAKEN_99",           archetype: "CENTER CONTROL" },
+                { name: "SPECTRE_X",           archetype: "TACTICS" },
+                { name: "VOID_WALKER",         archetype: "SPACE ADVANTAGE" },
+                { name: "NEURAL_LINK",         archetype: "COORDINATION" },
+                { name: "QUANTUM_GATE",        archetype: "DEVELOPMENT" },
+                { name: "CYBER_WOLF",          archetype: "TACTICS" },
+                { name: "GHOST_DECODED",       archetype: "KING SAFETY" },
+                { name: "PHANTOM_STRATEGIST",  archetype: "PLAN MAKING" },
+                { name: "AXON_BYPASS",         archetype: "OPEN FILE CONTROL" },
+                { name: "ZERO_ONE",            archetype: "PAWN STRUCTURE" },
+                { name: "CORE_BREACH",         archetype: "TACTICS" },
+                { name: "SIGNAL_LOST",         archetype: "SPACE ADVANTAGE" },
+                { name: "ENIGMA_NODE",         archetype: "COORDINATION" },
+                { name: "VECTOR_KING",         archetype: "CENTER CONTROL" },
+                { name: "GRID_MASTER",         archetype: "PAWN STRUCTURE" },
+                { name: "DEEP_PURPLE",         archetype: "PLAN MAKING" },
+                { name: "STATIC_VOID",         archetype: "KING SAFETY" },
+                { name: "BLUR_NODE",           archetype: "DEVELOPMENT" },
+                { name: "ROOT_ACCESS",         archetype: "OPEN FILE CONTROL" },
+                { name: "BYTE_ME",             archetype: "TACTICS" },
+                { name: "OMEGA_ONE",           archetype: "CENTER CONTROL" },
+                { name: "ALPHA_STRETCH",       archetype: "SPACE ADVANTAGE" },
+                { name: "DARK_EYE",            archetype: "COORDINATION" },
+                { name: "SILENT_STEP",         archetype: "KING SAFETY" }
+              ].map((user, i) => {
+                const archData = ARCHETYPE_MAP[user.archetype];
+                const ArchIcon = archData?.icon;
+                const archColor = archData?.color || 'text-neutral-500';
+                return (
+                  <div key={i} className="bg-white/5 border border-white/5 p-3 flex items-center justify-between group hover:border-tertiary transition-all hover:bg-tertiary/5">
+                    <div className="flex items-center gap-2.5">
+                       {ArchIcon && <ArchIcon className={`w-3.5 h-3.5 ${archColor} shrink-0 transition-all group-hover:drop-shadow-[0_0_6px_currentColor]`} />}
+                       <span className="font-mono text-[9px] font-bold text-neutral-500 group-hover:text-tertiary tracking-[0.15em]">{user.name}</span>
+                    </div>
+                    <CheckCircle2 className="w-3 h-3 text-neutral-800 group-hover:text-tertiary transition-colors" />
                   </div>
-                  <CheckCircle2 className="w-3 h-3 text-neutral-800 group-hover:text-tertiary transition-colors" />
-                </div>
-              ))}
+                );
+              })}
               <div className="bg-tertiary/10 border border-tertiary/30 p-3 flex flex-col items-center justify-center border-dashed border-2 group hover:bg-tertiary/20 transition-all cursor-pointer">
                 <span className="font-mono text-[8px] text-tertiary font-bold tracking-widest mb-1 italic">MORE_RECORDS</span>
                 <ChevronRight className="w-3 h-3 text-tertiary group-hover:translate-x-1 transition-transform" />
