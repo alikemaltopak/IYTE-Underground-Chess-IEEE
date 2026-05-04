@@ -39,7 +39,7 @@ SADECE aşağıdaki JSON formatında cevap ver:
 `;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-1.5-flash',
+      model: 'gemini-pro',
       contents: prompt,
       config: {
         responseMimeType: "application/json",
