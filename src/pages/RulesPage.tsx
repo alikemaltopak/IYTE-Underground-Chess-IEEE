@@ -194,26 +194,6 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
         </div>
       </main>
 
-      {/* Mobile Bottom Bar */}
-      <nav className="fixed bottom-0 w-full z-50 flex justify-around items-center h-16 pb-safe md:hidden bg-black/95 backdrop-blur-2xl border-t border-primary/30">
-        {[
-          { icon: LayoutGrid, label: "Home", onClick: onBack },
-          { icon: ShieldCheck, label: "Rules", active: true },
-          { icon: TerminalIcon, label: "Chat" },
-          { icon: Bot, label: "Match" }
-        ].map((item, i) => (
-          <div 
-            key={i} 
-            onClick={item.onClick}
-            className={`flex flex-col items-center justify-center p-2 transition-all ${
-              item.active ? 'bg-primary text-on-primary scale-110 shadow-[0_0_15px_rgba(74,225,118,0.5)]' : 'text-primary/40'
-            }`}
-          >
-            <item.icon className="w-5 h-5" />
-            <span className="text-[8px] font-bold uppercase mt-1">{item.label}</span>
-          </div>
-        ))}
-      </nav>
     </div>
   );
 };

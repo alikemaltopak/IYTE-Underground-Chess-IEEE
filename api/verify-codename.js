@@ -59,9 +59,11 @@ SADECE aşağıdaki JSON formatında cevap ver, hiçbir ekstra metin veya markdo
     const resultAI = await model.generateContent(prompt);
     const responseText = resultAI.response.text();
     
-    // JSON temizleme (Markdown bloklarını kaldır)
-    const cleanedJson = responseText.replace(/```json|```/gi, '').trim();
-    const result = JSON.parse(cleanedJson);
+    // JSON temizleme (JSON dışındaki her şeyi temizle)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Invalid AI response format");
+    
+    const result = JSON.parse(jsonMatch[0]);
     
     res.status(200).json(result);
 
