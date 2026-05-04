@@ -101,7 +101,7 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
     setCodenameStatus('scanning');
     
     try {
-      const response = await fetch('http://localhost:3001/api/verify-codename', {
+      const response = await fetch('/api/verify-codename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codename })
