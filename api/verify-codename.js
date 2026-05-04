@@ -36,7 +36,7 @@ export default async function handler(req, res) {
     }
 
     const ai = new GoogleGenAI(process.env.GEMINI_API_KEY);
-    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
 Bir yeraltı siberpunk satranç turnuvasının güvenlik moderatörüsün.
