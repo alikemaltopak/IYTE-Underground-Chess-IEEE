@@ -23,20 +23,27 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
 
   const [selectedArchetype, setSelectedArchetype] = useState('CENTER CONTROL');
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const handleJoinTournament = async () => {
     if (!user) return;
     setSaving(true);
+    setSaveError('');
     try {
-      await savePlayer(user.uid, {
+      const result = await savePlayer(user.uid, {
         codename,
         studentId: studentNumber,
         archetype: selectedArchetype,
         email: user.email || ''
       });
+      if (!result.success) {
+        setSaveError(result.error || 'Kayıt sırasında bir hata oluştu.');
+        return;
+      }
       onEnterTournament();
     } catch (err) {
       console.error('Kayıt hatası:', err);
+      setSaveError('Sunucu hatası. Lütfen tekrar deneyin.');
     } finally {
       setSaving(false);
     }

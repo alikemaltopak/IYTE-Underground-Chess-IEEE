@@ -36,6 +36,16 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
 
   const playerCount = players.length;
 
+  // Determine active tournament format based on player count
+  const getActiveFormat = (count: number): number => {
+    if (count <= 10) return 0;
+    if (count <= 24) return 1;
+    if (count <= 35) return 2;
+    if (count <= 50) return 3;
+    return 4;
+  };
+  const activeFormat = getActiveFormat(playerCount);
+
   return (
     <div id="dashboard-top" className="min-h-screen bg-[#050505] text-on-surface font-sans cyber-grid selection:bg-primary/20 relative overflow-x-hidden pt-16">
       <div className="fixed inset-0 pointer-events-none opacity-20 scanline z-50"></div>
@@ -82,7 +92,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
             <div className="relative z-10 mt-6 md:mt-0 text-right">
               <div className="flex items-baseline gap-2">
                 <span className="font-display text-7xl text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.6)]">{playerCount}</span>
-                <span className="text-2xl text-neutral-500 font-bold">/ 64</span>
+                <span className="text-2xl text-neutral-500 font-bold">KATILIMCI</span>
               </div>
               <div className="flex items-center justify-end gap-2 text-primary text-[10px] font-bold tracking-widest">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
@@ -103,20 +113,26 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               { num: "1", title: "ROUND ROBIN", desc: "Küçük gruplar için idealdir. Herkes herkesle oynar.", sub: "4-10 KİŞİ" },
               { num: "2", title: "SWISS SYSTEM", desc: "Orta ölçekli katılımcılar için standart protocol.", sub: "11-24 KİŞİ" },
               { num: "3", title: "DOUBLE ELIMINATION", desc: "Yüksek rekabet. İki mağlubiyet alan operatör elenir.", sub: "25-35 KİŞİ" },
-              { num: "4", title: "HYBRID_PROTOCOL", desc: "Swiss turlarını takiben eleme aşamasına geçiş.", sub: "35-50 KİŞİ", highlighted: true },
+              { num: "4", title: "HYBRID_PROTOCOL", desc: "Swiss turlarını takiben eleme aşamasına geçiş.", sub: "35-50 KİŞİ" },
               { num: "5", title: "SINGLE ELIMINATION", desc: "Büyük çaplı operasyonlar için direkt eleme sistemi.", sub: "50+ KİŞİ" }
-            ].map((item, i) => (
-              <div key={i} className={`group relative p-4 transition-all duration-300 ${
-                  item.highlighted ? 'bg-[#050505] border-2 border-primary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-[#121212] border border-white/10 hover:border-primary/50 hover:bg-primary/5'
-                }`}>
-                <div className="flex justify-between items-start mb-6">
-                  <span className={`text-xl font-bold ${item.highlighted ? 'text-primary' : 'text-neutral-600 group-hover:text-primary transition-colors'}`}>{item.num}</span>
-                  <span className={`text-[7px] font-mono font-bold px-2 py-1 whitespace-nowrap ${item.highlighted ? 'text-black bg-primary' : 'text-neutral-700 bg-neutral-800'}`}>{item.sub}</span>
+            ].map((item, i) => {
+              const isActive = activeFormat === i;
+              return (
+                <div key={i} className={`group relative p-4 transition-all duration-500 ${
+                    isActive ? 'bg-[#050505] border-2 border-primary shadow-[0_0_20px_rgba(34,197,94,0.4)]' : 'bg-[#121212] border border-white/10 hover:border-primary/50 hover:bg-primary/5'
+                  }`}>
+                  <div className="flex justify-between items-start mb-6">
+                    <span className={`text-xl font-bold ${isActive ? 'text-primary' : 'text-neutral-600 group-hover:text-primary transition-colors'}`}>{item.num}</span>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[7px] font-mono font-bold px-2 py-1 whitespace-nowrap ${isActive ? 'text-black bg-primary' : 'text-neutral-700 bg-neutral-800'}`}>{item.sub}</span>
+                      {isActive && <span className="text-[7px] font-mono font-bold px-2 py-1 bg-primary text-black tracking-widest animate-pulse">AKTİF</span>}
+                    </div>
+                  </div>
+                  <h3 className={`font-display text-sm mb-2 text-primary`}>{item.title}</h3>
+                  <p className={`text-[9px] leading-relaxed font-bold tracking-widest ${isActive ? 'text-neutral-300' : 'text-neutral-500'}`}>{item.desc}</p>
                 </div>
-                <h3 className={`font-display text-sm mb-2 ${item.highlighted ? 'text-primary' : 'text-primary'}`}>{item.title}</h3>
-                <p className={`text-[9px] leading-relaxed font-bold tracking-widest ${item.highlighted ? 'text-neutral-300' : 'text-neutral-500'}`}>{item.desc}</p>
-              </div>
-            ))}
+              );
+            })}
           </section>
 
           {/* Tournament System Table Section */}
@@ -141,7 +157,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               <div className="hidden md:flex flex-col items-end">
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-display text-primary drop-shadow-[0_0_10px_rgba(74,225,118,0.4)]">{playerCount}</span>
-                  <span className="text-xl text-neutral-600 font-bold italic">/ 64</span>
+                  <span className="text-sm text-neutral-600 font-bold italic">KATILIMCI</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_5px_#4ae176]"></div>
@@ -262,7 +278,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               <div className="flex flex-col items-end">
                 <div className="flex items-baseline gap-1">
                   <span className="text-4xl font-display text-tertiary drop-shadow-[0_0_10px_rgba(168,85,247,0.4)]">{playerCount}</span>
-                  <span className="text-xl text-neutral-600 font-bold italic">/ 64</span>
+                  <span className="text-sm text-neutral-600 font-bold italic">KAYITLI</span>
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <div className="w-2 h-2 rounded-full bg-tertiary animate-pulse shadow-[0_0_5px_#a855f7]"></div>
