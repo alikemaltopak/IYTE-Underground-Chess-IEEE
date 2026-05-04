@@ -6,17 +6,25 @@ import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { getPlayer, PlayerData } from '../services/playerService';
 
-const archetypeImages: Record<string, string> = {
-  'CENTER CONTROL': '/archetype_queen_1777845711451.png',
-  DEVELOPMENT: '/archetype_knight_1777845681434.png',
-  'KING SAFETY': '/archetype_rook_1777845755157.png',
-  'PAWN STRUCTURE': '/archetype_pawn_1777845767210.png',
-  'OPEN FILE CONTROL': '/archetype_bishop_1777845695755.png',
-  TACTICS: '/archetype_cipher_1777845778793.png',
-  COORDINATION: '/archetype_overseer_1777845810324.png',
-  'SPACE ADVANTAGE': '/archetype_phantom_1777845795649.png',
-  'PLAN MAKING': '/archetype_strategist_1777845727599.png'
-};
+const archetypes = [
+  { name: 'CENTER CONTROL', desc: 'Merkezi ele geçir, oyunu sen yönlendir. Taşlarının hareket alanını artırırken rakibin seçeneklerini kısıtla. Oyunun temposunu belirleyen temel güç.', img: '/archetype_queen_1777845711451.png' },
+  { name: 'DEVELOPMENT', desc: 'Taşlarını hızlı ve verimli geliştir. Erken oyunda aktif olmayan taş = kayıp tempo. Hızlı gelişim, erken baskı demektir.', img: '/archetype_knight_1777845681434.png' },
+  { name: 'KING SAFETY', desc: 'Şahını koru, oyunda kal. Erken rok ile savunmanı kur, saldırıya güvenle hazırlan. Savunması zayıf şah = kaybedilmiş oyun.', img: '/archetype_rook_1777845755157.png' },
+  { name: 'PAWN STRUCTURE', desc: 'Piyonlar oyunun iskeletidir. Zayıf yapı uzun vadede çöker, sağlam yapı oyunu taşır. Stratejik savaşların görünmeyen kahramanı.', img: '/archetype_pawn_1777845767210.png' },
+  { name: 'OPEN FILE CONTROL', desc: 'Açık hatları ele geçir, kalelerini aktif kullan. Dikey baskı kurarak rakibin savunmasını parçala. Doğru hatta yerleşen kale = ölümcül güç.', img: '/archetype_bishop_1777845695755.png' },
+  { name: 'TACTICS', desc: 'Ani hamlelerle oyunu bitir. Çatal, çivi ve fedalarla rakibi hazırlıksız yakala. Bir hamlede oyunun kaderini değiştir.', img: '/archetype_cipher_1777845778793.png' },
+  { name: 'COORDINATION', desc: 'Taşlarını birlikte konuştur. Uyumlu çalışan taşlar tek tek olandan kat kat güçlüdür. Gerçek güç, takım oyunundan gelir.', img: '/archetype_overseer_1777845810324.png' },
+  { name: 'SPACE ADVANTAGE', desc: 'Alanı kontrol et, rakibi sıkıştır. Daha fazla alan = daha fazla seçenek. Rakibini nefessiz bırakan stratejik üstünlük.', img: '/archetype_phantom_1777845795649.png' },
+  { name: 'PLAN MAKING', desc: 'Plansız hamle yok. Her hareket bir amaca hizmet etmeli. Kazanan oyuncu, düşünen oyuncudur.', img: '/archetype_strategist_1777845727599.png' }
+];
+
+const archetypeImages: Record<string, string> = {};
+const archetypeDescs: Record<string, string> = {};
+
+archetypes.forEach(a => {
+  archetypeImages[a.name] = a.img;
+  archetypeDescs[a.name] = a.desc;
+});
 
 export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void; view: any; setView: (v: any) => void }) => {
   const { user, logout } = useAuth();
@@ -60,13 +68,13 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
       <Navbar view={view} setView={setView} />
 
       <main className="relative z-10 max-w-6xl mx-auto px-6 py-12">
-        <section className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr]">
+        <section className="grid gap-10 lg:grid-cols-2">
           <div className="space-y-6">
-            <div className="glass-panel border border-white/10 p-8">
+            <div className="glass-panel border border-white/10 p-8 break-words">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
                 <div className="max-w-2xl">
                   <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold mb-3">KULLANICI PROFİLİ</p>
-                  <h1 className="text-5xl md:text-6xl font-display uppercase tracking-[0.05em] text-white leading-tight">{player?.codename || 'Profil Sayfan'}</h1>
+                  <h1 className="text-3xl md:text-4xl font-display uppercase tracking-[0.05em] text-white leading-tight break-words">{player?.codename || 'Profil Sayfan'}</h1>
                   <p className="text-neutral-400 mt-4 max-w-xl text-sm md:text-base">Burada yarışma bilgilerin, seçtiğin karakter ve maç detaylarını görebilirsin. Turnuva başlamadan önce kullanıcı adını ve archetype'ını güncelleyebilirsin.</p>
                 </div>
                 <button
@@ -79,7 +87,7 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+            <div className="grid gap-6 xl:grid-cols-2">
               <div className="glass-panel border border-white/10 p-8 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-t from-[#040404] via-transparent to-transparent pointer-events-none"></div>
                 <div className="flex flex-col gap-6 relative z-10">
@@ -93,20 +101,36 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                       </div>
                     </div>
 
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                      <div className="rounded-3xl bg-[#0f1115] p-5 border border-white/5 text-center">
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">Tarih</p>
-                        <p className="text-white text-2xl">21 Mayıs</p>
-                        <p className="text-neutral-400 text-xs mt-1">2026</p>
+                    <div className="grid grid-cols-1 gap-3 break-words">
+                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
+                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center shrink-0">
+                          <p className="text-[8px] uppercase text-primary font-bold">MAY</p>
+                          <p className="text-white text-lg font-display leading-none">21</p>
+                        </div>
+                        <div>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>
+                          <p className="text-white text-sm font-bold">21 Mayıs 2026</p>
+                        </div>
                       </div>
-                      <div className="rounded-3xl bg-[#0f1115] p-5 border border-white/5 text-center">
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">Saat</p>
-                        <p className="text-white text-2xl">18:00</p>
+
+                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
+                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
+                          <Clock3 className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Saat</p>
+                          <p className="text-white text-sm font-bold">18:00 (UTC+3)</p>
+                        </div>
                       </div>
-                      <div className="rounded-3xl bg-[#0f1115] p-5 border border-white/5 text-center">
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2">Konum</p>
-                        <p className="text-white text-2xl">İYTE</p>
-                        <p className="text-neutral-400 text-xs mt-1">Yeraltı Salon A</p>
+
+                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
+                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
+                          <MapPin className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Konum</p>
+                          <p className="text-white text-sm font-bold">İYTE Salon A</p>
+                        </div>
                       </div>
                     </div>
 
@@ -117,21 +141,7 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                 </div>
               </div>
 
-              <div className="glass-panel border border-white/10 p-8 flex flex-col gap-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold">Hızlı Link</p>
-                    <button
-                      onClick={onBack}
-                      className="mt-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary hover:text-white"
-                    >
-                      Ana Sayfaya Dön
-                    </button>
-                  </div>
-                  <div className="text-right text-[10px] uppercase tracking-[0.3em] text-neutral-500">Profil</div>
-                </div>
-
-                {loading ? (
+                <div className="glass-panel border border-white/10 p-8 flex flex-col gap-6">{loading ? (
                   <div className="rounded-3xl bg-[#090b0f] p-6 text-neutral-400">Profil yükleniyor...</div>
                 ) : error ? (
                   <div className="rounded-3xl bg-[#090b0f] p-6 text-red-400">{error}</div>
@@ -142,16 +152,16 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                       <div className="space-y-6 text-neutral-300">
                         <div>
                           <p className="text-[9px] uppercase tracking-[0.3em] text-neutral-500 mb-2">Kullanıcı Adı</p>
-                          <p className="text-4xl md:text-5xl font-black text-white tracking-tight">{player.codename}</p>
+                          <p className="text-xl md:text-2xl font-black text-white tracking-tight break-words">{player.codename}</p>
                         </div>
                         <div className="grid gap-3 text-sm text-neutral-300">
                           <div className="flex justify-between gap-4">
                             <span className="text-neutral-500">Öğrenci No</span>
                             <span className="font-semibold text-white">{player.studentId}</span>
                           </div>
-                          <div className="flex justify-between gap-4">
-                            <span className="text-neutral-500">E-posta</span>
-                            <span className="font-semibold text-white">{player.email}</span>
+                          <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 border-b border-white/5 pb-2">
+                            <span className="text-neutral-500 text-[11px]">E-posta</span>
+                            <span className="font-semibold text-white text-xs break-all text-right">{player.email}</span>
                           </div>
                           <div className="flex justify-between gap-4">
                             <span className="text-neutral-500">Durum</span>
@@ -184,17 +194,39 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
             </div>
           </div>
 
-          <div className="relative flex-1 rounded-[28px] overflow-hidden border border-white/10 bg-[#0b0d11] shadow-[0_0_50px_rgba(0,0,0,0.35)]">
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/40"></div>
-            <img
-              src={cardImage}
-              alt={player?.archetype || 'Karakter resmi'}
-              className="h-full w-full object-cover opacity-90"
-            />
-            <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-[#020305] via-transparent to-transparent">
-              <p className="text-[10px] uppercase tracking-[0.35em] text-primary font-bold">Seçilen Karakter</p>
-              <h2 className="text-3xl md:text-4xl font-display text-white mt-3">{player?.archetype || 'Belirlenmedi'}</h2>
-              <p className="text-neutral-300 mt-3 max-w-md">Turnuva başlamadan önce bu karakteri istediğin kadar güncelleyebilirsin. Öğrenci numaran sabit kalır.</p>
+          <div className="flex items-start justify-center lg:h-full pt-4">
+            <div className="relative w-full max-w-[450px] aspect-[3/4] rounded-[24px] overflow-hidden border border-white/10 bg-[#0b0d11] shadow-[0_0_50px_rgba(0,0,0,0.35)] group">
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10"></div>
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-80 group-hover:scale-110 transition-transform duration-1000"
+                style={{ backgroundImage: `url(${cardImage})` }}
+              ></div>
+              <div className="absolute inset-x-0 bottom-0 p-6 z-20">
+                <div className="inline-block px-2 py-0.5 bg-primary/20 border border-primary/30 mb-3">
+                  <p className="text-[8px] uppercase tracking-[0.3em] text-primary font-bold">ARCHETYPE_CARD</p>
+                </div>
+                <h2 className="text-3xl md:text-4xl font-display text-white mb-3 uppercase italic tracking-tighter drop-shadow-lg leading-none">
+                  {player?.archetype || 'BELİRLENMEDİ'}
+                </h2>
+                <div className="bg-black/40 backdrop-blur-md p-4 border border-white/5 rounded-xl mb-6">
+                  <p className="text-neutral-300 text-[11px] leading-relaxed font-medium">
+                    {player?.archetype ? archetypeDescs[player.archetype] : 'Turnuva başlamadan önce bu karakteri istediğin kadar güncelleyebilirsin. Öğrenci numaran sabit kalır.'}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between border-t border-white/10 pt-4">
+                  <div className="space-y-1">
+                    <p className="text-[7px] text-neutral-500 uppercase tracking-widest font-bold">OPERATOR_STATUS</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                      <span className="text-[9px] font-mono text-primary uppercase">VERIFIED_ENTRY</span>
+                    </div>
+                  </div>
+                  <div className="w-8 h-8 border border-white/10 flex items-center justify-center opacity-40">
+                    <span className="text-primary text-sm italic">♟</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
