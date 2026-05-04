@@ -6,9 +6,9 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 async function main() {
   try {
-    console.log("Testing gemini-2.0-flash...");
+    console.log("Testing gemini-2.5-flash...");
     const response = await ai.models.generateContent({
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
       contents: "Hello, say 'SYSTEM_READY' if you can hear me.",
     });
     console.log("Response:", response.text);
