@@ -14,23 +14,30 @@ export interface PlayerData {
   status: 'registered' | 'active' | 'eliminated';
 }
 
-// Check if a studentId is already used by another player
-export const isStudentIdTaken = async (studentId: string, currentUid: string): Promise<boolean> => {
+// Check if a studentId is already used (only for NEW character creation)
+export const isStudentIdTaken = async (studentId: string): Promise<boolean> => {
   const q = query(collection(db, 'players'), where('studentId', '==', studentId));
   const snapshot = await getDocs(q);
-  return snapshot.docs.some(doc => doc.id !== currentUid);
+  return snapshot.docs.length > 0;
 };
 
-// Check if a codename is already used by another player
-export const isCodenameTaken = async (codename: string, currentUid: string): Promise<boolean> => {
+// Check if a codename is already used (excluding a specific uid)
+export const isCodenameTaken = async (codename: string, excludeUid?: string): Promise<boolean> => {
   const upperCodename = codename.toUpperCase();
   const q = query(collection(db, 'players'), where('codename', '==', upperCodename));
   const snapshot = await getDocs(q);
-  // Also check case-insensitive by querying the original
-  if (snapshot.docs.some(doc => doc.id !== currentUid)) return true;
-  const q2 = query(collection(db, 'players'), where('codename', '==', codename));
-  const snapshot2 = await getDocs(q2);
-  return snapshot2.docs.some(doc => doc.id !== currentUid);
+  if (excludeUid) {
+    return snapshot.docs.some(doc => doc.id !== excludeUid);
+  }
+  return snapshot.docs.length > 0;
+};
+
+// Check if student ID can be updated (should not be allowed after creation)
+export const canUpdateStudentId = async (uid: string, newStudentId: string): Promise<boolean> => {
+  const existingPlayer = await getPlayer(uid);
+  if (!existingPlayer) return true; // Yeni karakter oluşturabilir
+  // StudentID'si varsa değiştiremez
+  return false;
 };
 
 // Save or update a player profile (with uniqueness validation)
@@ -38,27 +45,54 @@ export const savePlayer = async (
   uid: string, 
   data: { codename: string; studentId: string; archetype: string; email: string }
 ): Promise<{ success: boolean; error?: string }> => {
-  // Check duplicate student ID
-  const studentTaken = await isStudentIdTaken(data.studentId, uid);
-  if (studentTaken) {
-    return { success: false, error: 'Bu öğrenci numarası zaten başka bir hesapta kayıtlı.' };
+  const existingPlayer = await getPlayer(uid);
+  
+  // YENI KARAKTER OLUŞTURMA
+  if (!existingPlayer) {
+    // Check duplicate student ID
+    const studentTaken = await isStudentIdTaken(data.studentId);
+    if (studentTaken) {
+      return { success: false, error: 'Bu öğrenci numarası zaten başka bir hesapta kayıtlı.' };
+    }
+
+    // Check duplicate codename
+    const codenameTaken = await isCodenameTaken(data.codename);
+    if (codenameTaken) {
+      return { success: false, error: 'Bu kullanıcı adı zaten başka bir oyuncu tarafından kullanılıyor.' };
+    }
+
+    const playerRef = doc(db, 'players', uid);
+    await setDoc(playerRef, {
+      uid,
+      codename: data.codename,
+      studentId: data.studentId,
+      archetype: data.archetype,
+      email: data.email,
+      joinedAt: serverTimestamp(),
+      status: 'registered'
+    }, { merge: true });
+
+    return { success: true };
+  }
+  
+  // KARAKTERİ GÜNCELLEME - StudentID DEĞİŞTİRİLEMEZ
+  if (existingPlayer.studentId !== data.studentId) {
+    return { success: false, error: 'Öğrenci numarası sabit tutulmuştur ve değiştirilemez.' };
   }
 
-  // Check duplicate codename
-  const codenameTaken = await isCodenameTaken(data.codename, uid);
-  if (codenameTaken) {
-    return { success: false, error: 'Bu kullanıcı adı zaten başka bir oyuncu tarafından kullanılıyor.' };
+  // Codename değiştirmişse kontrol et
+  if (existingPlayer.codename !== data.codename) {
+    const codenameTaken = await isCodenameTaken(data.codename, uid);
+    if (codenameTaken) {
+      return { success: false, error: 'Bu kullanıcı adı zaten başka bir oyuncu tarafından kullanılıyor.' };
+    }
   }
 
+  // Update işlemi
   const playerRef = doc(db, 'players', uid);
   await setDoc(playerRef, {
-    uid,
     codename: data.codename,
-    studentId: data.studentId,
-    archetype: data.archetype,
-    email: data.email,
-    joinedAt: serverTimestamp(),
-    status: 'registered'
+    archetype: data.archetype
   }, { merge: true });
 
   return { success: true };

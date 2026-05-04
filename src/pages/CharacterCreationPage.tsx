@@ -3,14 +3,16 @@ import {
   ShieldCheck as ShieldIcon, AlertCircle, LogIn, Loader2,
   Target, Zap, Shield, Grid3X3, AlignVerticalSpaceAround, Sword, Network, Expand, BrainCircuit
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { savePlayer } from '../services/playerService';
+import { savePlayer, getPlayer, PlayerData } from '../services/playerService';
 
 export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView }: { onBack: () => void, onEnterTournament: () => void, view: any, setView: (v: any) => void }) => {
   const { user } = useAuth();
+  const [existingPlayer, setExistingPlayer] = useState<PlayerData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [studentNumber, setStudentNumber] = useState('');
   const [verifyingStudent, setVerifyingStudent] = useState(false);
   const [studentVerified, setStudentVerified] = useState(false);
@@ -24,6 +26,29 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
   const [selectedArchetype, setSelectedArchetype] = useState('CENTER CONTROL');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+
+  // Load existing player data
+  useEffect(() => {
+    const loadExistingPlayer = async () => {
+      if (!user) return;
+      try {
+        const player = await getPlayer(user.uid);
+        if (player) {
+          setExistingPlayer(player);
+          setStudentNumber(player.studentId);
+          setCodename(player.codename);
+          setSelectedArchetype(player.archetype);
+          setStudentVerified(true);
+        }
+      } catch (err) {
+        console.error('Oyuncu verisi yükleme hatası:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadExistingPlayer();
+  }, [user]);
 
   const handleJoinTournament = async () => {
     if (!user) return;
@@ -136,10 +161,17 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
               <label className="block text-xs md:text-sm text-on-surface-variant uppercase mb-4 font-black tracking-widest border-l-4 border-primary pl-4 py-1">
                 Öğrenci Numaranı Gir
               </label>
+              {existingPlayer && (
+                <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded mb-4">
+                  <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">⚠️ ÖĞRENCİ NUMARASI SABİT</p>
+                  <p className="text-[10px] text-blue-300 font-mono mt-1">Öğrenci numarası ilk kayıt sonrası değiştirilemez. Sadece Kullanıcı Adını ve Archetype'ı güncelleyebilirsiniz.</p>
+                </div>
+              )}
               <div className="relative">
                 <input 
                   type="text"
                   value={studentNumber}
+                  disabled={existingPlayer !== null}
                   onChange={(e) => {
                     const val = e.target.value;
                     setStudentNumber(val);
@@ -152,7 +184,7 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
                       setStudentError('');
                     }
                   }}
-                  className={`w-full bg-surface-container-high border ${studentError ? 'border-red-500' : 'border-outline-variant focus:border-primary'} focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-outline-variant/30`}
+                  className={`w-full bg-surface-container-high border ${studentError ? 'border-red-500' : 'border-outline-variant focus:border-primary'} focus:ring-0 text-primary text-lg font-mono p-4 rounded-none outline-none transition-all placeholder:text-outline-variant/30 ${existingPlayer ? 'opacity-50 cursor-not-allowed' : ''}`}
                   placeholder="2X0201XXX"
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 w-2 h-6 bg-primary/20 animate-pulse"></span>
@@ -162,12 +194,12 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
               )}
               <button 
                 onClick={handleVerifyStudent}
-                disabled={verifyingStudent || studentVerified || studentNumber.length !== 9 || /[^\d]/.test(studentNumber)}
+                disabled={verifyingStudent || studentVerified || studentNumber.length !== 9 || /[^\d]/.test(studentNumber) || existingPlayer !== null}
                 className={`w-full font-display font-bold py-5 uppercase flex items-center justify-center gap-4 transition-all active:scale-[0.98] ${
                   studentVerified 
                     ? 'bg-[#4ae176] text-black shadow-[0_0_40px_rgba(74,225,118,0.9)] border-2 border-white' 
                     : 'bg-primary text-on-primary hover:shadow-[0_0_20px_rgba(74,225,118,0.3)]'
-                } ${verifyingStudent || studentNumber.length !== 9 || /[^\d]/.test(studentNumber) ? 'opacity-50' : ''}`}
+                } ${verifyingStudent || studentNumber.length !== 9 || /[^\d]/.test(studentNumber) || existingPlayer !== null ? 'opacity-50' : ''}`}
               >
                 {verifyingStudent ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldIcon className="w-5 h-5" />}
                 {verifyingStudent ? 'DOĞRULANIYOR...' : (studentVerified ? 'ONAYLANDI' : 'DOĞRULA')}

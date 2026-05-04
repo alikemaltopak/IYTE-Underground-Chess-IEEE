@@ -7,16 +7,25 @@ export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => v
       İYTE YERALTI
     </div>
     <nav className="hidden md:flex items-center gap-6">
-      {['DASHBOARD', 'CHARACTER', 'TOURNAMENT', 'PROTOCOL'].map((item) => (
+      {['DASHBOARD', 'PROFILE', 'CHARACTER', 'TOURNAMENT', 'PROTOCOL'].map((item) => (
         <a 
           key={item}
-          className={`text-[10px] font-bold tracking-[0.2em] transition-all hover:text-primary ${(view === 'home' && item === 'DASHBOARD') || (view === 'rules' && item === 'PROTOCOL') || (view === 'tournament-dashboard' && item === 'TOURNAMENT') || (view === 'character-creation' && item === 'CHARACTER') ? 'text-primary border-b border-primary pb-1' : 'text-neutral-500'}`} 
+          className={`text-[10px] font-bold tracking-[0.2em] transition-all hover:text-primary ${
+            (view === 'home' && item === 'DASHBOARD') ||
+            (view === 'profile' && item === 'PROFILE') ||
+            (view === 'rules' && item === 'PROTOCOL') ||
+            (view === 'tournament-dashboard' && item === 'TOURNAMENT') ||
+            (view === 'character-creation' && item === 'CHARACTER')
+              ? 'text-primary border-b border-primary pb-1' 
+              : 'text-neutral-500'
+          }`} 
           href="#" 
           onClick={(e) => {
             e.preventDefault();
             if (item === 'PROTOCOL') setView('rules');
             else if (item === 'TOURNAMENT') setView('tournament-dashboard');
             else if (item === 'CHARACTER') setView('character-creation');
+            else if (item === 'PROFILE') setView('profile');
             else setView('home');
           }}
         >
