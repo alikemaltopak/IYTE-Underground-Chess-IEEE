@@ -4,7 +4,9 @@ import { LogOut, CalendarDays, MapPin, Clock3 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { getPlayer, PlayerData } from '../services/playerService';
+import { PlayerData } from '../services/playerService';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const archetypes = [
   { name: 'CENTER CONTROL', desc: 'Merkezi ele geçir, oyunu sen yönlendir. Taşlarının hareket alanını artırırken rakibin seçeneklerini kısıtla. Oyunun temposunu belirleyen temel güç.', img: '/archetype_queen_1777845711451.png' },
@@ -33,26 +35,25 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const loadProfile = async () => {
-      if (!user) return;
-      setLoading(true);
-      setError('');
-      try {
-        const playerData = await getPlayer(user.uid);
-        if (!playerData) {
-          setError('Karakter bilgisi bulunamadı. Karakter oluşturmak için ana sayfaya dönün.');
-          return;
-        }
-        setPlayer(playerData);
-      } catch (err) {
-        console.error('Profil yükleme hatası:', err);
-        setError('Profil verisi alınırken bir hata oluştu.');
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (!user) return;
+    setLoading(true);
+    setError('');
 
-    loadProfile();
+    const playerRef = doc(db, 'players', user.uid);
+    const unsubscribe = onSnapshot(playerRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setPlayer(docSnap.data() as PlayerData);
+      } else {
+        setError('Karakter bilgisi bulunamadı. Karakter oluşturmak için ana sayfaya dönün.');
+      }
+      setLoading(false);
+    }, (err) => {
+      console.error('Profil yükleme hatası:', err);
+      setError('Profil verisi alınırken bir hata oluştu.');
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const handleLogout = async () => {
@@ -68,6 +69,36 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
       <Navbar view={view} setView={setView} />
 
       <main className="relative z-10 max-w-6xl mx-auto px-6 py-12">
+
+        {/* HAYALET MAÇ UYARISI - Sayfanın en üstünde, kaçırılması imkansız */}
+        {player?.upcomingMatch && (
+          <div className="mb-8 rounded-2xl bg-primary/10 border-2 border-primary p-6 shadow-[0_0_30px_rgba(34,197,94,0.3)] relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-primary animate-pulse" />
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary inline-block animate-pulse" />
+                  SİSTEM MESAJI: ÇATIŞMA VAKTİ
+                </p>
+                <p className="text-white text-sm mb-1">
+                  Sistem sizi bir eşleşmeye atadı. Aşağıdaki butona tıklayarak satranç tahtasına (Lichess) intikal edin.
+                </p>
+                <p className="text-xs text-neutral-400">
+                  Renginiz: <span className="text-primary font-bold">{player.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
+                </p>
+              </div>
+              <a 
+                href={player.upcomingMatch} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="shrink-0 inline-block bg-primary text-black font-black text-xs uppercase tracking-widest py-3 px-8 hover:bg-white transition-colors text-center"
+              >
+                MAÇ ALANINA GİRİŞ YAP
+              </a>
+            </div>
+          </div>
+        )}
+
         <section className="grid gap-10 lg:grid-cols-2">
           <div className="space-y-6">
             <div className="glass-panel border border-white/10 p-8 break-words">
@@ -141,7 +172,10 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                 </div>
               </div>
 
-                <div className="glass-panel border border-white/10 p-8 flex flex-col gap-6">{loading ? (
+                <div className="glass-panel border border-white/10 p-8 flex flex-col gap-6">
+
+
+                  {loading ? (
                   <div className="rounded-3xl bg-[#090b0f] p-6 text-neutral-400">Profil yükleniyor...</div>
                 ) : error ? (
                   <div className="rounded-3xl bg-[#090b0f] p-6 text-red-400">{error}</div>

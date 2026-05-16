@@ -12,6 +12,14 @@ export interface PlayerData {
   email: string;
   joinedAt: Timestamp | null;
   status: 'registered' | 'active' | 'eliminated';
+  // Lichess Hayalet Maç Alanları
+  upcomingMatch?: string;
+  matchId?: string;
+  matchColor?: 'white' | 'black';
+  // Skor Takibi
+  wins?: number;
+  losses?: number;
+  draws?: number;
 }
 
 // Check if a studentId is already used (only for NEW character creation)

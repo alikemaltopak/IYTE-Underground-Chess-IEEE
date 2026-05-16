@@ -6,11 +6,12 @@ import { CharacterCreationPage } from './pages/CharacterCreationPage';
 import { TournamentDashboardPage } from './pages/TournamentDashboardPage';
 import { UserProfilePage } from './pages/UserProfilePage';
 import { LoginPage } from './pages/LoginPage';
+import { AdminTestPage } from './pages/AdminTestPage';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const [view, setView] = useState<'home' | 'rules' | 'character-creation' | 'tournament-dashboard' | 'profile'>('home');
+  const [view, setView] = useState<'home' | 'rules' | 'character-creation' | 'tournament-dashboard' | 'profile' | 'admin-test'>('home');
 
   // Loading state while Firebase checks auth
   if (loading) {
@@ -46,6 +47,10 @@ function AppContent() {
 
   if (view === 'profile') {
     return <UserProfilePage onBack={() => setView('home')} view={view} setView={setView} />;
+  }
+
+  if (view === 'admin-test') {
+    return <AdminTestPage view={view} setView={setView} />;
   }
 
   return <HomePage view={view} setView={setView} />;

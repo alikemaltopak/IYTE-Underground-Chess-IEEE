@@ -84,6 +84,71 @@ app.post('/api/verify-codename', async (req, res) => {
   }
 });
 
+// ==========================================
+// HAYALET MAÇ (GHOST MATCH) LİCHESS APİLERİ
+// ==========================================
+
+// 1. Yeni Hayalet Maç Başlatma Endpointi
+app.post('/api/create-match', async (req, res) => {
+  try {
+    // 10 dakika + 5 saniye artırmalı maç
+    const response = await fetch('https://lichess.org/api/challenge/open', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        'clock.limit': '600',
+        'clock.increment': '5',
+        'name': 'Yeraltı Çatışması'
+      })
+    });
+    
+    const data = await response.json();
+    
+    // Lichess API returns challenge data at the root object
+    if (data.id) {
+      console.log(`[SATRANÇ] Yeni Maç Oluşturuldu: ${data.id}`);
+      res.json({
+        success: true,
+        matchId: data.id,
+        urlWhite: data.urlWhite,
+        urlBlack: data.urlBlack
+      });
+    } else {
+      console.error("[LICHESS API ERROR]", data);
+      res.status(400).json({ success: false, reason: "Lichess Maç Oluşturamadı", details: data });
+    }
+  } catch (error) {
+    console.error("Match Creation Error:", error);
+    res.status(500).json({ success: false, reason: "Sunucu Hatası" });
+  }
+});
+
+// 2. Maç Sonucunu Kontrol Etme Endpointi
+app.get('/api/match-result/:matchId', async (req, res) => {
+  const { matchId } = req.params;
+  try {
+    const response = await fetch(`https://lichess.org/game/export/${matchId}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    if (!response.ok) {
+      return res.json({ success: false, status: 'Maç bulunamadı veya henüz bitmedi.' });
+    }
+    
+    const gameData = await response.json();
+    
+    res.json({
+      success: true,
+      status: gameData.status, // 'started', 'mate', 'resign', 'draw' vb.
+      winner: gameData.winner || 'Beraberlik' // 'white' veya 'black'
+    });
+
+  } catch (error) {
+    console.error("Fetch Result Error:", error);
+    res.status(500).json({ success: false, reason: "Sunucu Hatası" });
+  }
+});
+
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Neural Verification Server running on port ${PORT}`);

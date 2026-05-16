@@ -1,6 +1,8 @@
-import { LayoutGrid, User, Shield, Terminal, Settings } from 'lucide-react';
+import { LayoutGrid, User, Shield, Terminal, Settings, ShieldAlert } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
+  const { user } = useAuth();
   const navItems = [
     { id: 'home', label: 'DASHBOARD', icon: LayoutGrid },
     { id: 'profile', label: 'PROFILE', icon: User },
@@ -8,6 +10,10 @@ export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => v
     { id: 'tournament-dashboard', label: 'TOURNAMENT', icon: Terminal },
     { id: 'rules', label: 'PROTOCOL', icon: Settings },
   ];
+
+  if (user?.email === 'alikemaltopak@gmail.com') {
+    navItems.push({ id: 'admin-test', label: 'ADMIN', icon: ShieldAlert });
+  }
 
   return (
     <>

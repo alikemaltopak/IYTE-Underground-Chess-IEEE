@@ -1,0 +1,333 @@
+import React, { useEffect, useState } from 'react';
+import { collection, doc, updateDoc, deleteField, deleteDoc, onSnapshot, setDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../context/AuthContext';
+import { Navbar } from '../components/Navbar';
+import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus } from 'lucide-react';
+
+export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
+  const { user } = useAuth();
+  const [players, setPlayers] = useState<any[]>([]);
+  const [matches, setMatches] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [matchLoading, setMatchLoading] = useState<string | null>(null);
+  const [processLoading, setProcessLoading] = useState<string | null>(null);
+
+  // Korumalı rota
+  if (user?.email !== 'alikemaltopak@gmail.com') {
+    return (
+      <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
+        <ShieldAlert className="w-16 h-16 text-red-500 mb-4" />
+        <h1 className="text-2xl font-bold font-display uppercase tracking-widest text-red-500">Erişim Reddedildi</h1>
+        <p className="text-neutral-400 mt-2">Bu alana sadece sistem yöneticileri girebilir.</p>
+      </div>
+    );
+  }
+
+  // Real-time oyuncu listesi
+  useEffect(() => {
+    const unsubPlayers = onSnapshot(collection(db, 'players'), (snapshot) => {
+      setPlayers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    const unsubMatches = onSnapshot(collection(db, 'matches'), (snapshot) => {
+      setMatches(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return () => { unsubPlayers(); unsubMatches(); };
+  }, []);
+
+  // === HIZLI MAÇ OLUŞTUR ===
+  const handleQuickMatch = async (targetPlayer: any) => {
+    if (!user) return;
+    setMatchLoading(targetPlayer.id);
+
+    try {
+      const res = await fetch('/api/create-match', { method: 'POST' });
+      const data = await res.json();
+
+      if (data.success) {
+        const { matchId, urlWhite, urlBlack } = data;
+
+        // matches koleksiyonuna kayıt at
+        await setDoc(doc(db, 'matches', matchId), {
+          matchId,
+          whitePlayerId: user.uid,
+          blackPlayerId: targetPlayer.id,
+          urlWhite,
+          urlBlack,
+          status: 'active',
+          createdAt: serverTimestamp()
+        });
+
+        // Her iki oyuncunun profiline linkleri yaz
+        await updateDoc(doc(db, 'players', targetPlayer.id), {
+          upcomingMatch: urlBlack,
+          matchId: matchId,
+          matchColor: 'black'
+        });
+
+        await updateDoc(doc(db, 'players', user.uid), {
+          upcomingMatch: urlWhite,
+          matchId: matchId,
+          matchColor: 'white'
+        });
+
+        alert(`Maç oluşturuldu!\nMatch ID: ${matchId}`);
+      } else {
+        alert("Maç oluşturulamadı: " + data.reason);
+      }
+    } catch (error: any) {
+      console.error("Hızlı Maç Hatası:", error);
+      alert("Hata: " + error.message);
+    } finally {
+      setMatchLoading(null);
+    }
+  };
+
+  // === MAÇ SONUCUNU İŞLE ===
+  const handleProcessMatch = async (match: any) => {
+    setProcessLoading(match.id);
+    try {
+      // Lichess'ten sonucu çek
+      const res = await fetch(`/api/match-result/${match.matchId}`);
+      const data = await res.json();
+
+      if (!data.success || data.status === 'started' || data.status === 'created') {
+        alert("Maç henüz bitmedi veya bulunamadı.\nDurum: " + (data.status || 'bilinmiyor'));
+        setProcessLoading(null);
+        return;
+      }
+
+      // Maç bitti! Sonucu işle
+      const whiteRef = doc(db, 'players', match.whitePlayerId);
+      const blackRef = doc(db, 'players', match.blackPlayerId);
+      const matchRef = doc(db, 'matches', match.id);
+
+      if (data.winner === 'white') {
+        // Beyaz kazandı
+        await updateDoc(whiteRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(blackRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${getPlayerName(match.whitePlayerId)} kazandı` });
+        alert(`Maç bitti! Kazanan: ${getPlayerName(match.whitePlayerId)} (BEYAZ)`);
+
+      } else if (data.winner === 'black') {
+        // Siyah kazandı
+        await updateDoc(whiteRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(blackRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(matchRef, { status: 'completed', winner: 'black', result: `${getPlayerName(match.blackPlayerId)} kazandı` });
+        alert(`Maç bitti! Kazanan: ${getPlayerName(match.blackPlayerId)} (SİYAH)`);
+
+      } else {
+        // Beraberlik
+        await updateDoc(whiteRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(blackRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(matchRef, { status: 'completed', winner: 'draw', result: 'Beraberlik' });
+        alert("Maç berabere bitti!");
+      }
+
+    } catch (error: any) {
+      console.error("Process error:", error);
+      alert("İşlem hatası: " + error.message);
+    } finally {
+      setProcessLoading(null);
+    }
+  };
+
+  // === TEK MAÇ SİL ===
+  const handleDeleteMatch = async (match: any) => {
+    if (!confirm(`"${getPlayerName(match.whitePlayerId)} vs ${getPlayerName(match.blackPlayerId)}" maçını silmek istediğine emin misin?`)) return;
+    try {
+      // Oyuncuların maç bilgilerini temizle
+      const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+      await updateDoc(doc(db, 'players', match.whitePlayerId), clearFields).catch(() => {});
+      await updateDoc(doc(db, 'players', match.blackPlayerId), clearFields).catch(() => {});
+      // Maç kaydını sil
+      await deleteDoc(doc(db, 'matches', match.id));
+    } catch (err: any) {
+      alert('Silme hatası: ' + err.message);
+    }
+  };
+
+  // === TÜM MAÇLARI TEMİZLE ===
+  const handleClearAllMatches = async () => {
+    if (!confirm(`Toplam ${matches.length} maç kaydı silinecek. Emin misin?`)) return;
+    try {
+      for (const match of matches) {
+        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+        await updateDoc(doc(db, 'players', match.whitePlayerId), clearFields).catch(() => {});
+        await updateDoc(doc(db, 'players', match.blackPlayerId), clearFields).catch(() => {});
+        await deleteDoc(doc(db, 'matches', match.id));
+      }
+    } catch (err: any) {
+      alert('Toplu silme hatası: ' + err.message);
+    }
+  };
+
+  // Yardımcı: ID'den oyuncu adı bul
+  const getPlayerName = (uid: string) => {
+    const p = players.find(p => p.id === uid);
+    return p?.codename || uid;
+  };
+
+  // Aktif maçlar
+  const activeMatches = matches.filter(m => m.status === 'active');
+  const completedMatches = matches.filter(m => m.status === 'completed');
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-primary/30 relative">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.03)_0,transparent_100%)] pointer-events-none" />
+      <Navbar view={view} setView={setView} />
+      
+      <main className="pt-24 px-6 md:px-12 max-w-6xl mx-auto pb-20 relative z-10">
+        <header className="mb-10">
+          <h1 className="text-3xl md:text-5xl font-black font-display uppercase tracking-tighter text-primary drop-shadow-[0_0_15px_rgba(34,197,94,0.3)] flex items-center gap-4">
+            <ShieldAlert className="w-10 h-10" />
+            Admin Kontrol Paneli
+          </h1>
+          <p className="text-neutral-400 mt-2 tracking-widest text-sm">HAYALET MAÇ (GHOST MATCH) SİSTEMİ</p>
+        </header>
+
+        {/* TOPLU TEMİZLE BUTONU */}
+        {matches.length > 0 && (
+          <div className="mb-6 flex justify-end">
+            <button
+              onClick={handleClearAllMatches}
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-5 text-xs font-bold tracking-widest flex items-center gap-2"
+            >
+              <Trash2 className="w-3 h-3" /> TÜM MAÇLARI TEMİZLE ({matches.length})
+            </button>
+          </div>
+        )}
+
+        {/* AKTİF MAÇLAR */}
+        {activeMatches.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-lg font-bold text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Swords className="w-5 h-5" /> Aktif Maçlar ({activeMatches.length})
+            </h2>
+            <div className="space-y-3">
+              {activeMatches.map((match) => (
+                <div key={match.id} className="bg-white/5 border border-primary/20 p-4 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-white">
+                      ⬜ {getPlayerName(match.whitePlayerId)} <span className="text-neutral-500 mx-2">vs</span> ⬛ {getPlayerName(match.blackPlayerId)}
+                    </p>
+                    <p className="text-[10px] text-neutral-500 font-mono mt-1">ID: {match.matchId}</p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleProcessMatch(match)}
+                      disabled={processLoading === match.id}
+                      className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-2 px-4 text-xs font-bold tracking-widest flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {processLoading === match.id ? <Loader2 className="w-3 h-3 animate-spin" /> : '🔍 SONUCU İŞLE'}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteMatch(match)}
+                      className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-xs font-bold flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAMAMLANAN MAÇLAR */}
+        {completedMatches.length > 0 && (
+          <div className="mb-10">
+            <h2 className="text-lg font-bold text-neutral-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Trophy className="w-5 h-5" /> Tamamlanan Maçlar ({completedMatches.length})
+            </h2>
+            <div className="space-y-2">
+              {completedMatches.map((match) => (
+                <div key={match.id} className="bg-white/3 border border-white/5 p-3 rounded-lg flex items-center justify-between text-sm">
+                  <p className="text-neutral-300">
+                    ⬜ {getPlayerName(match.whitePlayerId)} vs ⬛ {getPlayerName(match.blackPlayerId)}
+                  </p>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                    match.winner === 'draw' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-primary/10 text-primary'
+                  }`}>
+                    {match.result}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* OYUNCU LİSTESİ */}
+        <h2 className="text-lg font-bold text-primary uppercase tracking-widest mb-4">Oyuncular</h2>
+        {loading ? (
+          <div className="flex justify-center items-center h-40">
+            <Loader2 className="w-8 h-8 text-primary animate-spin" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {players.filter(p => p.id !== user?.uid).map((player) => (
+              <div key={player.id} className="bg-white/5 border border-white/10 p-6 rounded-lg backdrop-blur-sm relative group overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-primary/50 group-hover:bg-primary transition-colors" />
+                
+                <h3 className="text-xl font-bold font-display uppercase tracking-wider mb-1">
+                  {player.codename || "Bilinmeyen Hedef"}
+                </h3>
+                <p className="text-xs text-neutral-500 font-mono mb-2">{player.email}</p>
+                
+                {/* Skor */}
+                <div className="flex gap-3 mb-4 text-xs">
+                  <span className="flex items-center gap-1 text-green-400"><Trophy className="w-3 h-3" /> {player.wins || 0}</span>
+                  <span className="flex items-center gap-1 text-red-400"><XCircle className="w-3 h-3" /> {player.losses || 0}</span>
+                  <span className="flex items-center gap-1 text-yellow-400"><Minus className="w-3 h-3" /> {player.draws || 0}</span>
+                </div>
+
+                {/* Aktif maç varsa bilgi göster + iptal butonu */}
+                {player.upcomingMatch && (
+                  <div className="mb-4 space-y-2">
+                    <div className="bg-primary/10 border border-primary/20 p-2 rounded text-xs text-primary flex items-center gap-2">
+                      <LinkIcon className="w-3 h-3" /> Aktif Maç Bekliyor
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+                        await updateDoc(doc(db, 'players', player.id), clearFields);
+                      }}
+                      className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-[10px] font-bold tracking-widest flex items-center justify-center gap-2"
+                    >
+                      <Trash2 className="w-3 h-3" /> MAÇI İPTAL ET
+                    </button>
+                  </div>
+                )}
+
+                {/* Hızlı maç butonu — sadece aktif maçı yoksa */}
+                {!player.upcomingMatch && (
+                  <button 
+                    onClick={() => handleQuickMatch(player)}
+                    disabled={matchLoading === player.id}
+                    className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 py-2.5 px-4 font-bold tracking-widest text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {matchLoading === player.id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Swords className="w-4 h-4" />
+                        HIZLI MAÇ
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            ))}
+            
+            {players.length <= 1 && (
+              <div className="col-span-full text-center text-neutral-500 py-10">
+                Sistemde test edilecek başka oyuncu bulunmuyor.
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
