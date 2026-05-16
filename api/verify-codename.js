@@ -29,9 +29,12 @@ export default async function handler(req, res) {
     Analyze the user's requested codename: "${codename}"
     
     Validation Rules:
-    1. MUST NOT contain real human names (first or last names).
+    1. MUST NOT contain real human names (first or last names), typical Turkish name abbreviations (e.g., M.Ali, A.Kemal), or their common nicknames/diminutives (e.g., Ati, Furko, Memo, Ibo).
     2. MUST NOT contain real-world locations (cities, countries, specific addresses).
-    3. MUST NOT contain offensive, toxic, or inappropriate content.
+    3. MUST NOT contain ANY offensive, toxic, profanity, or inappropriate content. 
+       - CRITICAL: You must detect Turkish swear words, insults, slang, and their common abbreviations (e.g., amk, aq, oc, sg, ibne, pic).
+       - CRITICAL: You must detect advanced obfuscated profanity (leetspeak) and phonetic wordplays where letters are replaced by numbers, symbols, or have missing vowels (e.g., 0c, b0k, a.q, s1k, şrfsz).
+       - CRITICAL: You must detect complex profanity mixed with numbers or numbers used phonetically in Turkish (e.g., "s2" = siki, "100" = yüz, "skip60", "s2le100leş").
     4. MUST maintain anonymity (cyberpunk aesthetic preferred).
     5. Length should be between 3 and 20 characters.
     

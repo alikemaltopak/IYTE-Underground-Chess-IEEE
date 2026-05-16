@@ -38,22 +38,25 @@ app.post('/api/verify-codename', async (req, res) => {
     }
 
     const prompt = `
-Bir yeraltı siberpunk satranç turnuvasının güvenlik moderatörüsün.
-Kullanıcının kullanmak istediği takma ad: "${codename}"
-
-Geçerli bir takma ad için kurallar:
-1. Gerçek insan isimleri İÇERMEMELİ (Örn: Ali, John, Kemal, Ayşe, Topak).
-2. Gerçek lokasyonlar, şehirler veya adresler İÇERMEMELİ (Örn: Izmir, Turkey, London).
-3. Toksik, hakaret, küfürlü veya cinsel içerik İÇERMEMELİ.
-4. Anonimliği korumalıdır.
-
-Lütfen bu takma adı analiz et. Kurallardan herhangi birini ihlal ediyorsa reddet.
-SADECE aşağıdaki JSON formatında cevap ver, hiçbir ekstra metin veya markdown formatı kullanma:
-{
-  "valid": true/false,
-  "reason": "Eğer false ise, siberpunk temasına uygun kısa bir hata mesajı (Örn: 'Gerçek kimlik tespit edildi', 'Uygunsuz dil tespit edildi', 'Lokasyon verisi engellendi'). Eğer true ise boş bırak."
-}
-`;
+    You are the 'NEURAL_SECURITY_GATEWAY' for a cyberpunk chess tournament.
+    Analyze the user's requested codename: "${codename}"
+    
+    Validation Rules:
+    1. MUST NOT contain real human names (first or last names), typical Turkish name abbreviations (e.g., M.Ali, A.Kemal), or their common nicknames/diminutives (e.g., Ati, Furko, Memo, Ibo).
+    2. MUST NOT contain real-world locations (cities, countries, specific addresses).
+    3. MUST NOT contain ANY offensive, toxic, profanity, or inappropriate content. 
+       - CRITICAL: You must detect Turkish swear words, insults, slang, and their common abbreviations (e.g., amk, aq, oc, sg, ibne, pic).
+       - CRITICAL: You must detect advanced obfuscated profanity (leetspeak) and phonetic wordplays where letters are replaced by numbers, symbols, or have missing vowels (e.g., 0c, b0k, a.q, s1k, şrfsz).
+       - CRITICAL: You must detect complex profanity mixed with numbers or numbers used phonetically in Turkish (e.g., "s2" = siki, "100" = yüz, "skip60", "s2le100leş").
+    4. MUST maintain anonymity (cyberpunk aesthetic preferred).
+    5. Length should be between 3 and 20 characters.
+    
+    Respond STRICTLY with a valid JSON object in this format:
+    {
+      "valid": boolean,
+      "reason": "Clear explanation in Turkish if valid is false, otherwise empty string"
+    }
+    `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
