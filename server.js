@@ -36,7 +36,10 @@ app.post('/api/verify-codename', async (req, res) => {
     if (/^\d+$/.test(codename)) {
       return res.json({ valid: false, reason: "Takma ad sadece rakamlardan oluşamaz." });
     }
-
+    
+    console.log(`\n[YENİ İSTEK] Takma ad doğrulaması isteniyor: "${codename}"`);
+    console.log(`[YAPAY ZEKA] Gemini modeline analiz isteği gönderiliyor...`);
+    
     const prompt = `
     You are the 'NEURAL_SECURITY_GATEWAY' for a cyberpunk chess tournament.
     Analyze the user's requested codename: "${codename}"
@@ -65,8 +68,14 @@ app.post('/api/verify-codename', async (req, res) => {
         responseMimeType: "application/json",
       }
     });
-
+    
     const result = JSON.parse(response.text);
+    
+    console.log(`[SONUÇ] Onaylandı mı?: ${result.valid ? 'EVET (Geçerli)' : 'HAYIR (Reddedildi)'}`);
+    if (!result.valid) {
+      console.log(`[RET SEBEBİ] ${result.reason}`);
+    }
+    
     res.json(result);
 
   } catch (error) {

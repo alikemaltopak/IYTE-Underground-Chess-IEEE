@@ -23,6 +23,9 @@ export default async function handler(req, res) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
+    console.log(`\n[YENİ İSTEK] Takma ad doğrulaması isteniyor: "${codename}"`);
+    console.log(`[YAPAY ZEKA] Gemini modeline analiz isteği gönderiliyor...`);
+
     // Stronger prompt to ensure JSON output and better validation
     const prompt = `
     You are the 'NEURAL_SECURITY_GATEWAY' for a cyberpunk chess tournament.
@@ -69,6 +72,11 @@ export default async function handler(req, res) {
       } else {
         throw new Error("Could not parse AI response as JSON.");
       }
+    }
+
+    console.log(`[SONUÇ] Onaylandı mı?: ${result.valid ? 'EVET (Geçerli)' : 'HAYIR (Reddedildi)'}`);
+    if (!result.valid) {
+      console.log(`[RET SEBEBİ] ${result.reason}`);
     }
 
     res.status(200).json(result);
