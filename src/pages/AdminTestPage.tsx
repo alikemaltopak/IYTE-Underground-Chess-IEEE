@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { collection, doc, updateDoc, deleteField, deleteDoc, onSnapshot, setDoc, increment, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteField, deleteDoc, onSnapshot, setDoc, increment, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
-import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus } from 'lucide-react';
+import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus, Timer, Gavel } from 'lucide-react';
 
 export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
   const { user } = useAuth();
@@ -12,6 +12,12 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
   const [loading, setLoading] = useState(true);
   const [matchLoading, setMatchLoading] = useState<string | null>(null);
   const [processLoading, setProcessLoading] = useState<string | null>(null);
+  const [, setTick] = useState(0); // Süre göstergesi için her saniye güncelle
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Korumalı rota
   if (user?.email !== 'alikemaltopak@gmail.com') {
@@ -48,7 +54,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
       if (data.success) {
         const { matchId, urlWhite, urlBlack } = data;
 
-        // matches koleksiyonuna kayıt at
+        // matches koleksiyonuna kayıt at (15 dk deadline ekle)
+        const deadline = new Date(Date.now() + 15 * 60 * 1000); // 15 dakika sonra
         await setDoc(doc(db, 'matches', matchId), {
           matchId,
           whitePlayerId: user.uid,
@@ -56,7 +63,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
           urlWhite,
           urlBlack,
           status: 'active',
-          createdAt: serverTimestamp()
+          createdAt: serverTimestamp(),
+          deadline: Timestamp.fromDate(deadline)
         });
 
         // Her iki oyuncunun profiline linkleri yaz
@@ -169,6 +177,44 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     return p?.codename || uid;
   };
 
+  // === HÜKMEN MAĞLUBİYET ===
+  const handleForfeit = async (match: any, absentColor: 'white' | 'black') => {
+    const winnerName = absentColor === 'white' ? getPlayerName(match.blackPlayerId) : getPlayerName(match.whitePlayerId);
+    const loserName = absentColor === 'white' ? getPlayerName(match.whitePlayerId) : getPlayerName(match.blackPlayerId);
+    if (!confirm(`${loserName} maça katılmadı. ${winnerName} hükmen galip ilan edilecek. Onaylıyor musun?`)) return;
+
+    const whiteRef = doc(db, 'players', match.whitePlayerId);
+    const blackRef = doc(db, 'players', match.blackPlayerId);
+    const matchRef = doc(db, 'matches', match.id);
+    const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+
+    if (absentColor === 'white') {
+      await updateDoc(whiteRef, { ...clearFields, losses: increment(1) });
+      await updateDoc(blackRef, { ...clearFields, wins: increment(1) });
+      await updateDoc(matchRef, { status: 'completed', winner: 'black', result: `${winnerName} kazandı (Hükmen)` });
+    } else {
+      await updateDoc(whiteRef, { ...clearFields, wins: increment(1) });
+      await updateDoc(blackRef, { ...clearFields, losses: increment(1) });
+      await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${winnerName} kazandı (Hükmen)` });
+    }
+  };
+
+  // Yardımcı: deadline geçmiş mi
+  const isDeadlinePassed = (match: any) => {
+    if (!match.deadline) return false;
+    return Date.now() > match.deadline.toDate().getTime();
+  };
+
+  // Yardımcı: kalan süre text
+  const getRemainingTime = (match: any) => {
+    if (!match.deadline) return '';
+    const remaining = match.deadline.toDate().getTime() - Date.now();
+    if (remaining <= 0) return 'SÜRE DOLDU';
+    const mins = Math.floor(remaining / 60000);
+    const secs = Math.floor((remaining % 60000) / 1000);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // Aktif maçlar
   const activeMatches = matches.filter(m => m.status === 'active');
   const completedMatches = matches.filter(m => m.status === 'completed');
@@ -206,31 +252,61 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
               <Swords className="w-5 h-5" /> Aktif Maçlar ({activeMatches.length})
             </h2>
             <div className="space-y-3">
-              {activeMatches.map((match) => (
-                <div key={match.id} className="bg-white/5 border border-primary/20 p-4 rounded-lg flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-bold text-white">
-                      ⬜ {getPlayerName(match.whitePlayerId)} <span className="text-neutral-500 mx-2">vs</span> ⬛ {getPlayerName(match.blackPlayerId)}
-                    </p>
-                    <p className="text-[10px] text-neutral-500 font-mono mt-1">ID: {match.matchId}</p>
+              {activeMatches.map((match) => {
+                const expired = isDeadlinePassed(match);
+                return (
+                <div key={match.id} className={`bg-white/5 border p-4 rounded-lg flex flex-col gap-3 ${expired ? 'border-red-500/40' : 'border-primary/20'}`}>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-bold text-white">
+                        ⬜ {getPlayerName(match.whitePlayerId)} <span className="text-neutral-500 mx-2">vs</span> ⬛ {getPlayerName(match.blackPlayerId)}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1">
+                        <p className="text-[10px] text-neutral-500 font-mono">ID: {match.matchId}</p>
+                        <span className={`text-[10px] font-bold flex items-center gap-1 ${expired ? 'text-red-400' : 'text-yellow-400'}`}>
+                          <Timer className="w-3 h-3" /> {getRemainingTime(match)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleProcessMatch(match)}
+                        disabled={processLoading === match.id}
+                        className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-2 px-4 text-xs font-bold tracking-widest flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {processLoading === match.id ? <Loader2 className="w-3 h-3 animate-spin" /> : '🔍 SONUCU İŞLE'}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteMatch(match)}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-xs font-bold flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    <button
-                      onClick={() => handleProcessMatch(match)}
-                      disabled={processLoading === match.id}
-                      className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 py-2 px-4 text-xs font-bold tracking-widest flex items-center gap-2 disabled:opacity-50"
-                    >
-                      {processLoading === match.id ? <Loader2 className="w-3 h-3 animate-spin" /> : '🔍 SONUCU İŞLE'}
-                    </button>
-                    <button
-                      onClick={() => handleDeleteMatch(match)}
-                      className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-xs font-bold flex items-center gap-1"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
+
+                  {/* Süre dolduysa hükmen mağlubiyet butonları */}
+                  {expired && (
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-red-500/20">
+                      <p className="text-[10px] text-red-400 font-bold flex items-center gap-1 mr-auto">
+                        <Gavel className="w-3 h-3" /> SÜRE DOLDU — Hükmen karar ver:
+                      </p>
+                      <button
+                        onClick={() => handleForfeit(match, 'white')}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 py-1.5 px-3 text-[10px] font-bold tracking-wider"
+                      >
+                        ⬜ {getPlayerName(match.whitePlayerId)} GELMEMEDİ
+                      </button>
+                      <button
+                        onClick={() => handleForfeit(match, 'black')}
+                        className="bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 py-1.5 px-3 text-[10px] font-bold tracking-wider"
+                      >
+                        ⬛ {getPlayerName(match.blackPlayerId)} GELMEMEDİ
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )})}
             </div>
           </div>
         )}

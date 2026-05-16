@@ -1,11 +1,11 @@
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { LogOut, CalendarDays, MapPin, Clock3 } from 'lucide-react';
+import { LogOut, CalendarDays, Globe, Clock3 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { PlayerData } from '../services/playerService';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const archetypes = [
@@ -33,6 +33,7 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [countdown, setCountdown] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -55,6 +56,34 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
 
     return () => unsubscribe();
   }, [user]);
+
+  // Geri sayım zamanlayıcısı
+  useEffect(() => {
+    if (!player?.matchId) { setCountdown(''); return; }
+
+    const matchRef = doc(db, 'matches', player.matchId);
+    const unsubMatch = onSnapshot(matchRef, (snap) => {
+      if (!snap.exists()) return;
+      const deadline = snap.data()?.deadline;
+      if (!deadline) return;
+
+      const tick = () => {
+        const remaining = deadline.toDate().getTime() - Date.now();
+        if (remaining <= 0) {
+          setCountdown('SÜRE DOLDU — Acilen katılın!');
+          return;
+        }
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        setCountdown(`${mins}:${secs.toString().padStart(2, '0')}`);
+      };
+      tick();
+      const interval = setInterval(tick, 1000);
+      return () => clearInterval(interval);
+    });
+
+    return () => unsubMatch();
+  }, [player?.matchId]);
 
   const handleLogout = async () => {
     await logout();
@@ -86,6 +115,11 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                 <p className="text-xs text-neutral-400">
                   Renginiz: <span className="text-primary font-bold">{player.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
                 </p>
+                {countdown && (
+                  <p className={`text-sm font-bold mt-2 font-mono ${countdown.includes('DOLDU') ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
+                    ⏱️ Katılım süresi: {countdown}
+                  </p>
+                )}
               </div>
               <a 
                 href={player.upcomingMatch} 
@@ -149,25 +183,25 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                           <Clock3 className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Saat</p>
-                          <p className="text-white text-sm font-bold">18:00 (UTC+3)</p>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Format</p>
+                          <p className="text-white text-sm font-bold">10+5 Rapid</p>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
                         <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
-                          <MapPin className="w-5 h-5 text-primary" />
+                          <Globe className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Konum</p>
-                          <p className="text-white text-sm font-bold">İYTE Salon A</p>
+                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Platform</p>
+                          <p className="text-white text-sm font-bold">Lichess.org (Çevrimiçi)</p>
                         </div>
                       </div>
                     </div>
 
                   <div className="rounded-3xl bg-[#111215] border border-primary/10 p-6">
                     <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold mb-4">Önemli Not</p>
-                    <p className="text-neutral-300 leading-relaxed">Turnuva başlangıcından önce lütfen kayıt kontrol noktasına gelin. Öğrenci kimliği doğrulaması sadece ilk kayıt sırasında yapılır; ardından öğrenci numaranız sabitlenir.</p>
+                    <p className="text-neutral-300 leading-relaxed">Tüm müsabakalar çevrimiçi olarak Lichess.org üzerinden oynanacaktır. Eşleşme linkiniz profil sayfanıza otomatik olarak iletilir. Maç sonuçları sistem tarafından otomatik çekilir.</p>
                   </div>
                 </div>
               </div>
@@ -214,11 +248,11 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                         </div>
                         <div className="flex items-center gap-3 text-neutral-300">
                           <Clock3 className="w-4 h-4 text-primary" />
-                          <span>Kayıt öncesi varış: 17:30</span>
+                          <span>Format: 10+5 Rapid</span>
                         </div>
                         <div className="flex items-center gap-3 text-neutral-300">
-                          <MapPin className="w-4 h-4 text-primary" />
-                          <span>İYTE Yeraltı Salon A</span>
+                          <Globe className="w-4 h-4 text-primary" />
+                          <span>Platform: Lichess.org</span>
                         </div>
                       </div>
                     </div>

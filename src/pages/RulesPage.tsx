@@ -45,11 +45,13 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
               <h2 className="font-display text-2xl text-primary uppercase tracking-tight italic">ANA PROTOKOL KURALLARI</h2>
             </div>
             <div className="space-y-6 text-on-surface-variant leading-relaxed text-sm font-bold tracking-widest uppercase">
-              <p><span className="text-primary">[KURAL 01]: ANONİM KİMLİK</span> — Gerçek isimler yasaktır. Her operatöre sistem tarafından benzersiz bir kod adı atanacaktır.</p>
-              <p><span className="text-primary">[KURAL 02]: 48S UPLINK</span> — Müsabaka koordinatları ve kesin zaman dilimi, başlangıçtan 48 saat önce güvenli kanal üzerinden iletilecektir.</p>
-              <p><span className="text-primary">[KURAL 03]: BLITZ CONSTRAINTS</span> — Tüm hamleler 5 dakikalık kısıtlı zaman dilimi içerisinde tamamlanmalıdır.</p>
+              <p><span className="text-primary">[KURAL 01]: ANONİM KİMLİK</span> — Gerçek isimler yasaktır. Her operatör, yapay zeka güvenlik taramasından geçen benzersiz bir kod adı belirleyecektir. Uygunsuz veya kimlik ifşa eden isimler sistem tarafından reddedilir.</p>
+              <p><span className="text-primary">[KURAL 02]: 48S UPLINK</span> — Müsabaka tarihi, saati ve özel Lichess maç linki, başlangıçtan 48 saat önce profil sayfanıza güvenli kanal üzerinden iletilecektir.</p>
+              <p><span className="text-primary">[KURAL 03]: RAPID PROTOCOL</span> — Tüm müsabakalar 10+5 (10 dakika + hamle başı 5 saniye artırma) formatında, Lichess altyapısı üzerinden çevrimiçi olarak oynanacaktır.</p>
               <p><span className="text-primary">[KURAL 04]: MERIT REWARDS</span> — Operasyon sonunda ilk 3'e giren operatörler IEEE tarafından ödüllendirilecektir.</p>
-              <p><span className="text-primary">[KURAL 05]: DYNAMIC ARCHITECTURE</span> — Turnuva düzeni ve eşleşme sistemi (Swiss, Double Elimination vb.), katılan operatör sayısına göre sistem tarafından otomatik olarak belirlenecektir.</p>
+              <p><span className="text-primary">[KURAL 05]: DYNAMIC ARCHITECTURE</span> — Turnuva düzeni ve eşleşme sistemi, katılan operatör sayısına göre sistem tarafından otomatik olarak belirlenecektir. 2 mağlubiyet alan operatör elenecektir.</p>
+              <p><span className="text-primary">[KURAL 06]: GHOST MATCH</span> — Her eşleşme için sistem tarafından özel bir Lichess linki oluşturulur. Beyaz ve Siyah renk ataması sistem tarafından yapılır. Operatörler sadece kendilerine atanan linke tıklayarak müsabakaya katılır.</p>
+              <p><span className="text-primary">[KURAL 07]: 15DK KATILIM SÜRESİ</span> — Maç linki oluşturulduktan sonra her iki operatörün de 15 dakika içinde bağlantıya tıklayarak müsabakaya katılması zorunludur. Süre dolduğunda katılmayan operatör <span className="text-red-500">HÜKMEN MAĞLUP</span> ilan edilir. Süre bitmeden yetişen operatör kaldığı yerden oynamaya devam eder.</p>
               <div className="mt-6 p-4 border border-primary/10 bg-primary/5 rounded-sm">
                 <p className="text-[10px] text-primary/70 italic tracking-widest flex items-center gap-2">
                   <Sparkles className="w-4 h-4" /> "Yeraltında her hamle bir iz bırakır, ama sadece en hızlılar hayatta kalır."
@@ -110,17 +112,22 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
             <div className="text-on-surface-variant space-y-6 text-sm font-bold tracking-widest uppercase">
               <div className="flex items-start space-x-4">
                 <div className="mt-1.5 w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
-                <p>Tam tarafsızlık ve adalet için her müsabaka sistem tarafından rastgele atanan anonim <span className="text-primary">HAKEMLER</span> tarafından denetlenecektir.</p>
+                <p>Tüm müsabakalar Lichess.org altyapısında oynanır. Lichess'in <span className="text-primary">ANTİ-CHEATSİSTEMİ</span> otomatik olarak aktiftir ve hile yapan operatörler anında tespit edilir.</p>
               </div>
               <div className="flex items-start space-x-4">
                 <div className="mt-1.5 w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
-                <p>Yazılımsal destek ve anti-cheat protokolü aktiftir. Yapay zeka tespiti durumunda operatör terminalden kalıcı olarak <span className="text-red-500">BANLANACAKTIR</span>.</p>
+                <p>Maç sırasında harici satranç motoru, yapay zeka veya üçüncü parti yazılım kullanımı tespit edildiğinde operatör sistemden kalıcı olarak <span className="text-red-500">BANLANACAKTIR</span>.</p>
+              </div>
+              <div className="flex items-start space-x-4">
+                <div className="mt-1.5 w-2 h-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></div>
+                <p>Maç sonuçları Lichess API üzerinden otomatik olarak sisteme çekilir. Kazanan ve kaybeden <span className="text-primary">OTOMATİK</span> olarak belirlenir.</p>
               </div>
               <div className="pt-4 border-t border-primary/10">
                 <div className="bg-black p-4 rounded-sm font-mono text-[9px] text-primary/60 leading-tight">
-                  ANALYZING_MOVE_STREAM...<br/>
-                  &gt;&gt; 99.4% CONSISTENCY CHECK...<br/>
-                  &gt;&gt; STATUS: CLEAN
+                  LICHESS_ANTICHEAT_SCAN...<br/>
+                  &gt;&gt; ENGINE_CORRELATION: 0.02% (CLEAN)<br/>
+                  &gt;&gt; TAB_SWITCH_MONITOR: ACTIVE<br/>
+                  &gt;&gt; STATUS: ALL_CLEAR
                 </div>
               </div>
             </div>
@@ -139,9 +146,10 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
             </div>
             <div className="space-y-4">
               {[
-                { label: "ABANDONMENT_ERROR", status: "INSTANT_DQ", color: "red-500" },
-                { label: "TOXIC_BUFFER_OVERFLOW", status: "COMM_SILENCE", color: "red-500" },
-                { label: "SANDBAGGING_DETECTION", status: "RATING_VOID", color: "red-500" }
+                { label: "LINK_TIMEOUT (10DK)", status: "HÜKMEN_MAĞLUBİYET", color: "red-500" },
+                { label: "ENGINE_DETECTION", status: "KALICI_BAN", color: "red-500" },
+                { label: "DOUBLE_LOSS_RULE", status: "ELİMİNASYON", color: "red-500" },
+                { label: "TOXIC_BEHAVIOR", status: "DİSKALİFİYE", color: "red-500" }
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center p-4 bg-surface-container-low border border-primary/10">
                   <span className="text-[10px] font-bold text-on-surface-variant tracking-wider">{item.label}</span>
@@ -168,10 +176,10 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
               </div>
             </div>
             <div className="font-mono text-[9px] text-primary/50 space-y-1">
-              <p>[22:41:09] SYSTEM: Protocol updated to v4.2.1. Chessboard encryption active.</p>
-              <p>[22:41:12] SECURITY: 4 foreign engines detected and neutralized in qualifying round.</p>
-              <p>[22:41:45] OPERATOR: New user 'VOID_RUNNER' joined the foyer.</p>
-              <p>[22:42:01] LOG: Terminal latency stabilized at 12ms.</p>
+              <p>[22:41:09] SYSTEM: Protocol updated to v5.0. Lichess Ghost Match integration active.</p>
+              <p>[22:41:12] SECURITY: Lichess anti-cheat monitoring enabled for all active matches.</p>
+              <p>[22:41:45] MATCH: Ghost link generated → lichess.org/xYz123 [WHITE: ███████ | BLACK: ███████]</p>
+              <p>[22:42:01] RESULT: Match xYz123 completed. Winner: BLACK. Scores updated automatically.</p>
             </div>
           </motion.section>
         </div>
