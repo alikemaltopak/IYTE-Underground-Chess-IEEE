@@ -134,7 +134,10 @@ app.get('/api/match-result', async (req, res) => {
       headers: { 'Accept': 'application/json' }
     });
     if (!response.ok) {
-      return res.json({ success: false, status: 'Maç bulunamadı veya henüz bitmedi.' });
+      if (response.status === 404) {
+        return res.json({ success: true, status: 'created' });
+      }
+      return res.json({ success: false, status: 'Maç bulunamadı veya hata oluştu.' });
     }
     const gameData = await response.json();
     res.json({
@@ -157,7 +160,10 @@ app.get('/api/match-result/:matchId', async (req, res) => {
     });
     
     if (!response.ok) {
-      return res.json({ success: false, status: 'Maç bulunamadı veya henüz bitmedi.' });
+      if (response.status === 404) {
+        return res.json({ success: true, status: 'created' });
+      }
+      return res.json({ success: false, status: 'Maç bulunamadı veya hata oluştu.' });
     }
     
     const gameData = await response.json();

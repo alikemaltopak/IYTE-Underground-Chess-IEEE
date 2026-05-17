@@ -57,15 +57,27 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
     return () => unsubscribe();
   }, [user]);
 
-  // Geri sayım zamanlayıcısı
+  // Geri sayım zamanlayıcısı ve maç durumu
+  const [matchStatus, setMatchStatus] = useState<string>('');
+
   useEffect(() => {
-    if (!player?.matchId) { setCountdown(''); return; }
+    if (!player?.matchId) { setCountdown(''); setMatchStatus(''); return; }
 
     const matchRef = doc(db, 'matches', player.matchId);
     const unsubMatch = onSnapshot(matchRef, (snap) => {
       if (!snap.exists()) return;
-      const deadline = snap.data()?.deadline;
-      if (!deadline) return;
+      const data = snap.data();
+      const deadline = data?.deadline;
+      const status = data?.status;
+      
+      if (status) {
+        setMatchStatus(status);
+      }
+
+      if (!deadline || status === 'started') {
+        setCountdown('');
+        return;
+      }
 
       const tick = () => {
         const remaining = deadline.toDate().getTime() - Date.now();
@@ -109,15 +121,26 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                   <span className="w-2 h-2 rounded-full bg-primary inline-block animate-pulse" />
                   SİSTEM MESAJI: ÇATIŞMA VAKTİ
                 </p>
-                <p className="text-white text-sm mb-1">
-                  Sistem sizi bir eşleşmeye atadı. Aşağıdaki butona tıklayarak satranç tahtasına (Lichess) intikal edin.
-                </p>
+                {matchStatus === 'started' ? (
+                  <p className="text-white text-sm mb-1 font-bold">
+                    Maça giriş yaptınız. Lichess üzerinde oynamaya devam edin.
+                  </p>
+                ) : (
+                  <p className="text-white text-sm mb-1">
+                    Sistem sizi bir eşleşmeye atadı. Aşağıdaki butona tıklayarak satranç tahtasına (Lichess) intikal edin.
+                  </p>
+                )}
                 <p className="text-xs text-neutral-400">
                   Renginiz: <span className="text-primary font-bold">{player.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
                 </p>
-                {countdown && (
+                {countdown && matchStatus !== 'started' && (
                   <p className={`text-sm font-bold mt-2 font-mono ${countdown.includes('DOLDU') ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
                     ⏱️ Katılım süresi: {countdown}
+                  </p>
+                )}
+                {matchStatus === 'started' && (
+                  <p className="text-sm font-bold mt-2 font-mono text-blue-400 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-400 inline-block animate-pulse" /> OYNANIYOR
                   </p>
                 )}
               </div>

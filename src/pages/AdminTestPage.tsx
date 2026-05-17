@@ -100,6 +100,12 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     try {
       // Lichess'ten sonucu çek
       const res = await fetch(`/api/match-result?matchId=${match.matchId}`);
+      
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Sunucudan geçerli bir JSON yanıtı alınamadı. (Lütfen local node server.js'yi yeniden başlattığınızdan emin olun)");
+      }
+      
       const data = await res.json();
 
       if (!data.success || data.status === 'started' || data.status === 'created') {

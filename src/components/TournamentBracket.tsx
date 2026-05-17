@@ -14,6 +14,7 @@ interface RoundRobinMatch {
   winnerId: string | null;
   status: 'pending' | 'active' | 'completed';
   lichessMatchId?: string;
+  lichessStatus?: string; // 'created' | 'started' | 'mate' | 'resign' etc.
 }
 
 interface TournamentRound {
@@ -270,34 +271,51 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       const newRounds = JSON.parse(JSON.stringify(tournament.rounds)) as TournamentRound[];
       let updated = false;
 
-      for (const round of newRounds) {
-        for (const match of round.matches) {
-          if (match.status !== 'active' || !match.lichessMatchId) continue;
+      // Tüm aktif maçları paralel sorgula (hız optimizasyonu)
+      const checks = newRounds.flatMap((round, rIdx) =>
+        round.matches.map((match, mIdx) => ({ match, rIdx, mIdx }))
+      ).filter(({ match }) => match.status === 'active' && match.lichessMatchId);
 
-          try {
-            const res = await fetch(`/api/match-result?matchId=${match.lichessMatchId}`);
-            const data = await res.json();
+      const results = await Promise.allSettled(
+        checks.map(({ match }) =>
+          fetch(`/api/match-result?matchId=${match.lichessMatchId}`)
+            .then(r => r.json())
+            .catch(() => null)
+        )
+      );
 
-            if (!data.success) continue;
+      for (let i = 0; i < checks.length; i++) {
+        const result = results[i];
+        if (result.status !== 'fulfilled' || !result.value?.success) continue;
+        const data = result.value;
+        const { rIdx, mIdx } = checks[i];
+        const match = newRounds[rIdx].matches[mIdx];
 
-            // Maç bitmişse sonucu işle
-            const finishedStatuses = ['mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime'];
-            if (finishedStatuses.includes(data.status)) {
-              if (data.status === 'draw' || data.status === 'stalemate' || data.winner === 'Beraberlik') {
-                match.winnerId = 'draw';
-              } else {
-                match.winnerId = data.winner === 'white' ? match.player1Id : match.player2Id;
-              }
-              match.status = 'completed';
-              updated = true;
+        const finishedStatuses = ['mate', 'resign', 'stalemate', 'timeout', 'draw', 'outoftime'];
+        if (finishedStatuses.includes(data.status)) {
+          if (data.status === 'draw' || data.status === 'stalemate' || data.winner === 'Beraberlik') {
+            match.winnerId = 'draw';
+          } else {
+            match.winnerId = data.winner === 'white' ? match.player1Id : match.player2Id;
+          }
+          match.status = 'completed';
+          match.lichessStatus = data.status;
+          updated = true;
 
-              // Oyuncu profillerinden maç bilgisini temizle
-              const { deleteField } = await import('firebase/firestore');
-              const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-              await updateDoc(doc(db, 'players', match.player1Id), clear).catch(() => {});
-              await updateDoc(doc(db, 'players', match.player2Id), clear).catch(() => {});
-            }
-          } catch { /* sessiz hata */ }
+          const { deleteField } = await import('firebase/firestore');
+          const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+          await updateDoc(doc(db, 'players', match.player1Id), clear).catch(() => {});
+          await updateDoc(doc(db, 'players', match.player2Id), clear).catch(() => {});
+        } else {
+          // Maç henüz bitmedi ama durumu güncelle
+          if (match.lichessStatus !== data.status) {
+            match.lichessStatus = data.status;
+            updated = true;
+            // Matches koleksiyonunu da güncelle (UserProfile timer'ı için)
+            updateDoc(doc(db, 'matches', match.lichessMatchId), {
+              status: data.status
+            }).catch(() => {});
+          }
         }
       }
 
@@ -591,9 +609,27 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                   const p1Won = match.winnerId === match.player1Id;
                   const p2Won = match.winnerId === match.player2Id;
                   const isDraw = match.winnerId === 'draw';
+                  const isActive = match.status === 'active';
+
+                  // Canlı durum metni
+                  const getStatusLabel = () => {
+                    if (match.status === 'pending') return null;
+                    if (isCompleted) return null;
+                    if (!match.lichessStatus || match.lichessStatus === 'created') return { text: `${getPlayerName(match.player1Id)} veya ${getPlayerName(match.player2Id)} BEKLENİYOR`, color: 'text-yellow-400', pulse: true };
+                    if (match.lichessStatus === 'started') return { text: 'OYNANIYOR', color: 'text-blue-400', pulse: true };
+                    return { text: match.lichessStatus.toUpperCase(), color: 'text-neutral-400', pulse: false };
+                  };
+                  const statusLabel = getStatusLabel();
 
                   return (
-                    <div key={match.id} className={`border rounded-lg overflow-hidden ${isCompleted ? 'border-primary/20' : 'border-white/10'}`}>
+                    <div key={match.id} className={`border rounded-lg overflow-hidden ${isCompleted ? 'border-primary/20' : isActive ? 'border-blue-500/30' : 'border-white/10'}`}>
+                      {/* Canlı durum göstergesi */}
+                      {statusLabel && (
+                        <div className={`px-3 py-1.5 text-[9px] font-bold tracking-wider flex items-center gap-1.5 ${statusLabel.color} bg-white/3`}>
+                          {statusLabel.pulse && <span className="w-1.5 h-1.5 rounded-full bg-current inline-block animate-pulse" />}
+                          {statusLabel.text}
+                        </div>
+                      )}
                       {/* Player 1 */}
                       <button
                         onClick={() => !isCompleted && setMatchResult(rIdx, mIdx, match.player1Id)}

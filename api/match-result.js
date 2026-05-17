@@ -20,7 +20,11 @@ export default async function handler(req, res) {
     });
 
     if (!response.ok) {
-      return res.json({ success: false, status: 'Maç bulunamadı veya henüz bitmedi.' });
+      if (response.status === 404) {
+        // Lichess returns 404 if the game hasn't had any moves yet (just created)
+        return res.json({ success: true, status: 'created' });
+      }
+      return res.json({ success: false, status: 'Maç bulunamadı veya hata oluştu.' });
     }
 
     const gameData = await response.json();
