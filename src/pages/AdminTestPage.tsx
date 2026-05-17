@@ -3,7 +3,8 @@ import { collection, doc, updateDoc, deleteField, deleteDoc, onSnapshot, setDoc,
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
-import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus, Timer, Gavel } from 'lucide-react';
+import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus, Timer, Gavel, LayoutGrid } from 'lucide-react';
+import { TournamentBracket } from '../components/TournamentBracket';
 
 export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
   const { user } = useAuth();
@@ -12,7 +13,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
   const [loading, setLoading] = useState(true);
   const [matchLoading, setMatchLoading] = useState<string | null>(null);
   const [processLoading, setProcessLoading] = useState<string | null>(null);
-  const [, setTick] = useState(0); // Süre göstergesi için her saniye güncelle
+  const [, setTick] = useState(0);
+  const [adminTab, setAdminTab] = useState<'matches' | 'bracket'>('matches');
 
   useEffect(() => {
     const interval = setInterval(() => setTick(t => t + 1), 1000);
@@ -233,6 +235,34 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
           <p className="text-neutral-400 mt-2 tracking-widest text-sm">HAYALET MAÇ (GHOST MATCH) SİSTEMİ</p>
         </header>
 
+        {/* TAB NAVİGASYON */}
+        <div className="flex gap-2 mb-8 border-b border-white/10 pb-3">
+          <button
+            onClick={() => setAdminTab('matches')}
+            className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${
+              adminTab === 'matches' ? 'bg-primary/10 text-primary border border-primary/30' : 'text-neutral-500 hover:text-white border border-white/5'
+            }`}
+          >
+            <Swords className="w-4 h-4" /> Maç Yönetimi
+          </button>
+          <button
+            onClick={() => setAdminTab('bracket')}
+            className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest flex items-center gap-2 transition-all ${
+              adminTab === 'bracket' ? 'bg-primary/10 text-primary border border-primary/30' : 'text-neutral-500 hover:text-white border border-white/5'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" /> Turnuva Şeması
+          </button>
+        </div>
+
+        {/* TURNUVA ŞEMASI TAB'I */}
+        {adminTab === 'bracket' && (
+          <TournamentBracket players={players} getPlayerName={getPlayerName} />
+        )}
+
+        {/* MAÇ YÖNETİMİ TAB'I */}
+        {adminTab === 'matches' && (<>
+
         {/* TOPLU TEMİZLE BUTONU */}
         {matches.length > 0 && (
           <div className="mb-6 flex justify-end">
@@ -403,6 +433,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
             )}
           </div>
         )}
+        </>)}
       </main>
     </div>
   );
