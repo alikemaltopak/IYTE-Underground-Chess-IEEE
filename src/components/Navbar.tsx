@@ -11,7 +11,11 @@ export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => v
     { id: 'rules', label: 'PROTOCOL', icon: Settings },
   ];
 
-  if (user?.email === 'alikemaltopak@gmail.com') {
+  // Admin yetkisi olan e-posta adresleri artık .env dosyasından çekiliyor
+  const adminEmailsString = process.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
+  const adminEmails = adminEmailsString.split(',').map(e => e.trim());
+
+  if (user?.email && adminEmails.includes(user.email)) {
     navItems.push({ id: 'admin-test', label: 'ADMIN', icon: ShieldAlert });
   }
 
