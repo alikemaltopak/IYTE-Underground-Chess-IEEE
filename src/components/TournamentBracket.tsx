@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio } from 'lucide-react';
 
@@ -160,6 +160,8 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
   const [polling, setPolling] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [liveMatches, setLiveMatches] = useState<Record<string, any>>({});
+
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
       if (snap.exists() && !(snap.data() as any).deleted) {
@@ -169,7 +171,19 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       }
       setLoading(false);
     });
-    return () => unsub();
+
+    const unsubMatches = onSnapshot(collection(db, 'matches'), (snap) => {
+      const live: Record<string, any> = {};
+      snap.docs.forEach(doc => {
+        live[doc.id] = doc.data();
+      });
+      setLiveMatches(live);
+    });
+
+    return () => {
+      unsub();
+      unsubMatches();
+    };
   }, []);
 
   const registeredPlayers = players.filter(p => p.status === 'registered' || p.status === 'active');
@@ -315,6 +329,54 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             updateDoc(doc(db, 'matches', match.lichessMatchId), {
               status: data.status
             }).catch(() => {});
+          }
+
+          // OTOMATİK HÜKMEN MAĞLUBİYET KONTROLÜ
+          if (data.status === 'created' || !data.status) {
+            try {
+              const matchDoc = await getDoc(doc(db, 'matches', match.lichessMatchId));
+              if (matchDoc.exists()) {
+                const mData = matchDoc.data();
+                if (mData.deadline && Date.now() > mData.deadline.toDate().getTime()) {
+                  // Süre doldu! Kim girdi kim girmedi kontrol et
+                  const wJoined = mData.whiteJoined;
+                  const bJoined = mData.blackJoined;
+
+                  let forfeitWinner = null;
+                  let forfeitReason = '';
+
+                  if (wJoined && !bJoined) {
+                    forfeitWinner = match.player1Id; // Beyaz kazandı
+                    forfeitReason = 'Hükmen (Siyah Gelmedi)';
+                  } else if (bJoined && !wJoined) {
+                    forfeitWinner = match.player2Id; // Siyah kazandı
+                    forfeitReason = 'Hükmen (Beyaz Gelmedi)';
+                  } else if (!wJoined && !bJoined) {
+                    forfeitWinner = 'draw'; // İkisi de gelmedi
+                    forfeitReason = 'İkisi de Gelmedi';
+                  }
+
+                  if (forfeitWinner) {
+                    match.status = 'completed';
+                    match.winnerId = forfeitWinner;
+                    match.lichessStatus = forfeitReason;
+                    updated = true;
+
+                    const { deleteField } = await import('firebase/firestore');
+                    const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+                    await updateDoc(doc(db, 'players', match.player1Id), clear).catch(() => {});
+                    await updateDoc(doc(db, 'players', match.player2Id), clear).catch(() => {});
+                    await updateDoc(doc(db, 'matches', match.lichessMatchId), {
+                       status: 'completed',
+                       winner: forfeitWinner === match.player1Id ? 'white' : forfeitWinner === match.player2Id ? 'black' : 'draw',
+                       result: forfeitReason
+                    }).catch(() => {});
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Auto forfeit error:", e);
+            }
           }
         }
       }
@@ -615,7 +677,16 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                   const getStatusLabel = () => {
                     if (match.status === 'pending') return null;
                     if (isCompleted) return null;
-                    if (!match.lichessStatus || match.lichessStatus === 'created') return { text: `${getPlayerName(match.player1Id)} veya ${getPlayerName(match.player2Id)} BEKLENİYOR`, color: 'text-yellow-400', pulse: true };
+                    if (!match.lichessStatus || match.lichessStatus === 'created') {
+                      const liveMatch = match.lichessMatchId ? liveMatches[match.lichessMatchId] : null;
+                      if (liveMatch) {
+                        const wJoined = liveMatch.whiteJoined;
+                        const bJoined = liveMatch.blackJoined;
+                        if (wJoined && !bJoined) return { text: `${getPlayerName(match.player2Id)} BEKLENİYOR`, color: 'text-yellow-400', pulse: true };
+                        if (bJoined && !wJoined) return { text: `${getPlayerName(match.player1Id)} BEKLENİYOR`, color: 'text-yellow-400', pulse: true };
+                      }
+                      return { text: `${getPlayerName(match.player1Id)} veya ${getPlayerName(match.player2Id)} BEKLENİYOR`, color: 'text-yellow-400', pulse: true };
+                    }
                     if (match.lichessStatus === 'started') return { text: 'OYNANIYOR', color: 'text-blue-400', pulse: true };
                     return { text: match.lichessStatus.toUpperCase(), color: 'text-neutral-400', pulse: false };
                   };

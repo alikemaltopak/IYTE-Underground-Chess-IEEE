@@ -144,14 +144,23 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                   </p>
                 )}
               </div>
-              <a 
-                href={player.upcomingMatch} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="shrink-0 inline-block bg-primary text-black font-black text-xs uppercase tracking-widest py-3 px-8 hover:bg-white transition-colors text-center"
+              <button 
+                onClick={async () => {
+                  try {
+                    const { doc, updateDoc } = await import('firebase/firestore');
+                    const matchRef = doc(db, 'matches', player.matchId!);
+                    await updateDoc(matchRef, {
+                      [`${player.matchColor}Joined`]: true
+                    });
+                  } catch (e) {
+                    console.error("Failed to mark as joined:", e);
+                  }
+                  window.open(player.upcomingMatch, "_blank");
+                }}
+                className="shrink-0 inline-block bg-primary text-black font-black text-xs uppercase tracking-widest py-3 px-8 hover:bg-white transition-colors text-center cursor-pointer"
               >
                 MAÇ ALANINA GİRİŞ YAP
-              </a>
+              </button>
             </div>
           </div>
         )}
