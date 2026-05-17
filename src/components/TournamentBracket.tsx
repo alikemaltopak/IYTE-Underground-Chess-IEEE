@@ -105,11 +105,17 @@ function generateRoundRobin(playerIds: string[]): TournamentRound[] {
 
 // ============ FORMAT DETECTOR ============
 
-function detectFormat(playerCount: number): { format: string; label: string; desc: string } {
-  if (playerCount <= 8) {
-    return { format: 'round_robin', label: 'ROUND ROBİN', desc: `Herkes herkesle oynar • ${playerCount * (playerCount - 1) / 2} maç` };
-  }
-  return { format: 'single_elimination', label: 'TEK ELİMİNASYON', desc: `Kaybeden elenir • ${playerCount - 1} maç` };
+const FORMAT_TABLE = [
+  { min: 4, max: 10, format: 'round_robin', label: 'Round Robin', structure: 'Herkes herkese', matchRange: '6 – 45' },
+  { min: 11, max: 24, format: 'swiss', label: 'Swiss', structure: '4-5 tur', matchRange: '20 – 60' },
+  { min: 25, max: 35, format: 'double_elimination', label: 'Double Elimination', structure: 'Bracket', matchRange: '49 – 69' },
+  { min: 36, max: 50, format: 'hybrid', label: 'Hybrid_Protocol', structure: 'Swiss + Eleme', matchRange: '60 – 85' },
+  { min: 51, max: 9999, format: 'single_elimination', label: 'Single Elimination', structure: 'Direkt eleme', matchRange: '≤ n-1' },
+];
+
+function detectFormat(playerCount: number) {
+  const entry = FORMAT_TABLE.find(f => playerCount >= f.min && playerCount <= f.max);
+  return entry || FORMAT_TABLE[0];
 }
 
 // ============ STANDINGS CALCULATOR ============
@@ -366,47 +372,71 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             <Trophy className="w-6 h-6" /> Turnuva Şeması Oluştur
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* Otomatik Format */}
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-3">Otomatik Format Tespiti</p>
-              <div className="bg-primary/5 border border-primary/20 p-5">
-                <p className="text-sm font-bold text-primary">{formatInfo.label}</p>
-                <p className="text-[10px] text-neutral-400 mt-1">{formatInfo.desc}</p>
-                <p className="text-[10px] text-neutral-600 mt-2">
-                  {registeredPlayers.length} oyuncu → {registeredPlayers.length <= 8 ? 'Herkes herkesle' : 'Eleme formatı'}
+          <div className="mb-8">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-display uppercase tracking-widest text-primary italic flex items-center gap-3">
+                <Trophy className="w-6 h-6" /> Turnuva SİSTEMİ ve YAPILARI
+              </h2>
+              <div className="text-right">
+                <p className="text-4xl font-black text-primary leading-none">{registeredPlayers.length} <span className="text-sm font-bold text-neutral-500">KATILIMCI</span></p>
+                <p className="text-[9px] text-primary/60 font-bold tracking-widest flex items-center justify-end gap-1 mt-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block animate-pulse" /> LIVE_UPLINK_ACTIVE
                 </p>
-              </div>
-              
-              <div className="mt-4 p-4 bg-white/3 border border-white/5">
-                <p className="text-[9px] uppercase tracking-widest text-neutral-600 font-bold mb-2">Format Kuralları</p>
-                <div className="space-y-1 text-[10px] text-neutral-500">
-                  <p>• 2-8 oyuncu → Round Robin (herkes herkesle)</p>
-                  <p>• 9+ oyuncu → Tek Eliminasyon</p>
-                  <p>• Eşleşmeler otomatik ve adaletli dağıtılır</p>
-                  <p>• Her tura tarih ve saat atanır</p>
-                </div>
               </div>
             </div>
 
-            {/* Oyuncu Listesi */}
-            <div>
-              <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-3">
-                Kayıtlı Operatörler ({registeredPlayers.length})
-              </p>
-              <div className="space-y-1 max-h-[240px] overflow-y-auto pr-2">
-                {registeredPlayers.map((p, i) => (
-                  <div key={p.id} className="flex items-center gap-3 bg-white/5 border border-white/5 p-2.5 text-xs">
-                    <span className="text-[9px] text-neutral-600 font-mono w-5">#{i + 1}</span>
-                    <Users className="w-3 h-3 text-primary" />
-                    <span className="text-white font-bold">{p.codename}</span>
-                  </div>
-                ))}
-                {registeredPlayers.length === 0 && (
-                  <p className="text-neutral-600 text-xs text-center py-4">Kayıtlı oyuncu yok.</p>
-                )}
-              </div>
+            {/* Format Tablosu */}
+            <div className="overflow-x-auto mb-6">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-primary/20">
+                    <th className="text-left py-3 px-4 text-neutral-500 font-bold uppercase tracking-widest italic">Katılımcı Sayısı</th>
+                    <th className="text-left py-3 px-4 text-neutral-500 font-bold uppercase tracking-widest italic">SİSTEM</th>
+                    <th className="text-left py-3 px-4 text-neutral-500 font-bold uppercase tracking-widest italic">YAPI</th>
+                    <th className="text-left py-3 px-4 text-neutral-500 font-bold uppercase tracking-widest italic">TOPLAM MAÇ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {FORMAT_TABLE.map((f, i) => {
+                    const isActive = formatInfo.format === f.format;
+                    return (
+                      <tr key={i} className={`border-b border-white/5 ${isActive ? 'bg-primary/5' : ''}`}>
+                        <td className="py-3 px-4 text-white font-bold">{f.min} – {f.max > 100 ? '' : f.max} kişi{f.max > 100 ? '+' : ''}</td>
+                        <td className={`py-3 px-4 font-bold ${isActive ? 'text-primary' : 'text-primary/60'}`}>{f.label}</td>
+                        <td className="py-3 px-4 text-neutral-400">{f.structure}</td>
+                        <td className={`py-3 px-4 font-bold ${isActive ? 'text-primary' : 'text-primary/60'}`}>{f.matchRange}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
+
+            <div className="p-4 bg-primary/5 border border-primary/10">
+              <p className="text-[10px] text-primary/70 italic tracking-widest flex items-center gap-2">
+                ✨ SİSTEM KATILIMCI SAYISINA GÖRE OTOMATİK OPTİMİZE EDİLİR.
+              </p>
+            </div>
+          </div>
+
+          {/* Oyuncu Listesi */}
+          <div className="mb-8">
+            <p className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-3">
+              Kayıtlı Operatörler ({registeredPlayers.length})
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-1">
+              {registeredPlayers.map((p, i) => (
+                <div key={p.id} className="flex items-center gap-3 bg-white/5 border border-white/5 p-2.5 text-xs">
+                  <span className="text-[9px] text-neutral-600 font-mono w-5">#{i + 1}</span>
+                  <Users className="w-3 h-3 text-primary" />
+                  <span className="text-white font-bold">{p.codename}</span>
+                </div>
+              ))}
+            </div>
+            {registeredPlayers.length === 0 && (
+              <p className="text-neutral-600 text-xs text-center py-4">Kayıtlı oyuncu yok.</p>
+            )}
           </div>
 
           <button
