@@ -123,7 +123,32 @@ app.post('/api/create-match', async (req, res) => {
   }
 });
 
-// 2. Maç Sonucunu Kontrol Etme Endpointi
+// 2. Maç Sonucunu Kontrol Etme (query parametreli - Vercel uyumlu)
+app.get('/api/match-result', async (req, res) => {
+  const matchId = req.query.matchId;
+  if (!matchId) {
+    return res.status(400).json({ success: false, reason: 'matchId gerekli.' });
+  }
+  try {
+    const response = await fetch(`https://lichess.org/game/export/${matchId}`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      return res.json({ success: false, status: 'Maç bulunamadı veya henüz bitmedi.' });
+    }
+    const gameData = await response.json();
+    res.json({
+      success: true,
+      status: gameData.status,
+      winner: gameData.winner || 'Beraberlik'
+    });
+  } catch (error) {
+    console.error("Fetch Result Error:", error);
+    res.status(500).json({ success: false, reason: "Sunucu Hatası" });
+  }
+});
+
+// 2b. Maç Sonucunu Kontrol Etme (path parametreli - geriye uyumluluk)
 app.get('/api/match-result/:matchId', async (req, res) => {
   const { matchId } = req.params;
   try {

@@ -97,7 +97,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     setProcessLoading(match.id);
     try {
       // Lichess'ten sonucu çek
-      const res = await fetch(`/api/match-result/${match.matchId}`);
+      const res = await fetch(`/api/match-result?matchId=${match.matchId}`);
       const data = await res.json();
 
       if (!data.success || data.status === 'started' || data.status === 'created') {
