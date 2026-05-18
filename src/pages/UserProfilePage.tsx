@@ -1,6 +1,6 @@
 import { motion } from 'motion/react';
 import { useEffect, useState } from 'react';
-import { LogOut, CalendarDays, Globe, Clock3 } from 'lucide-react';
+import { LogOut, CalendarDays, Globe, Clock3, Sword, Target, Zap, Shield, Grid3X3, AlignVerticalSpaceAround, Network, Expand, BrainCircuit } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
@@ -27,6 +27,18 @@ archetypes.forEach(a => {
   archetypeImages[a.name] = a.img;
   archetypeDescs[a.name] = a.desc;
 });
+
+const ARCHETYPE_ICONS: Record<string, any> = {
+  'CENTER CONTROL': Target,
+  'DEVELOPMENT': Zap,
+  'KING SAFETY': Shield,
+  'PAWN STRUCTURE': Grid3X3,
+  'OPEN FILE CONTROL': AlignVerticalSpaceAround,
+  'TACTICS': Sword,
+  'COORDINATION': Network,
+  'SPACE ADVANTAGE': Expand,
+  'PLAN MAKING': BrainCircuit,
+};
 
 export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void; view: any; setView: (v: any) => void }) => {
   const { user, logout } = useAuth();
@@ -59,14 +71,39 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
 
   // Geri sayım zamanlayıcısı ve maç durumu
   const [matchStatus, setMatchStatus] = useState<string>('');
+  const [matchData, setMatchData] = useState<any>(null);
+
+  const [tournament, setTournament] = useState<any>(null);
+  const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
-    if (!player?.matchId) { setCountdown(''); setMatchStatus(''); return; }
+    const unsubTourney = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) setTournament(snap.data());
+      else setTournament(null);
+    });
+    
+    const unsubPlayers = onSnapshot(collection(db, 'players'), (snap) => {
+      const pMap: Record<string, any> = {};
+      snap.docs.forEach(d => {
+        pMap[d.id] = {
+          codename: d.data().codename || 'Bilinmeyen',
+          archetype: d.data().archetype
+        };
+      });
+      setPlayersMap(pMap);
+    });
+
+    return () => { unsubTourney(); unsubPlayers(); };
+  }, []);
+
+  useEffect(() => {
+    if (!player?.matchId) { setCountdown(''); setMatchStatus(''); setMatchData(null); return; }
 
     const matchRef = doc(db, 'matches', player.matchId);
     const unsubMatch = onSnapshot(matchRef, (snap) => {
-      if (!snap.exists()) return;
+      if (!snap.exists()) { setMatchData(null); return; }
       const data = snap.data();
+      setMatchData(data);
       const deadline = data?.deadline;
       const status = data?.status;
       
@@ -188,53 +225,73 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
               <div className="glass-panel border border-white/10 p-8 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-t from-[#040404] via-transparent to-transparent pointer-events-none"></div>
                 <div className="flex flex-col gap-6 relative z-10">
-<div className="flex items-start gap-4 mb-6">
-                      <div className="rounded-full bg-primary/10 p-4 text-primary">
-                        <Clock3 className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold">Turnuva Başlangıcı</p>
-                        <h2 className="text-4xl md:text-5xl font-bold text-white mt-2 leading-tight">21 Mayıs 2026</h2>
-                      </div>
-                    </div>
+                  {(() => {
+                    let upcomingScheduledMatch = null;
+                    let upcomingRound = null;
 
-                    <div className="grid grid-cols-1 gap-3 break-words">
-                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
-                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center shrink-0">
-                          <p className="text-[8px] uppercase text-primary font-bold">MAY</p>
-                          <p className="text-white text-lg font-display leading-none">21</p>
+                    if (tournament?.rounds && user) {
+                      for (const round of tournament.rounds) {
+                        if (round.started) continue; // Başlamış turları atla
+                        const myMatch = round.matches.find((m: any) => m.player1Id === user.uid || m.player2Id === user.uid);
+                        if (myMatch && myMatch.status === 'pending') {
+                          upcomingScheduledMatch = myMatch;
+                          upcomingRound = round;
+                          break; // En yakın maçı bulduk
+                        }
+                      }
+                    }
+
+                    if (!upcomingScheduledMatch || !upcomingRound) {
+                      return (
+                        <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
+                          <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
+                          <p className="text-neutral-400 text-sm">Şu an için planlanmış bir müsabaka bulunmuyor.</p>
                         </div>
-                        <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>
-                          <p className="text-white text-sm font-bold">21 Mayıs 2026</p>
+                      );
+                    }
+
+                    const dateStr = `${upcomingRound.date}T${upcomingRound.time}`;
+                    const scheduledTime = new Date(dateStr);
+                    const now = new Date();
+                    const diffHours = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+                    if (diffHours > 48) {
+                      return (
+                        <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
+                          <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
+                          <p className="text-neutral-400 text-sm">Gelecek müsabaka bilgileri, müsabakaya 48 saat kala açıklanacaktır.</p>
+                        </div>
+                      );
+                    }
+
+                    const isWhite = upcomingScheduledMatch.player1Id === user.uid;
+                    const opponentId = isWhite ? upcomingScheduledMatch.player2Id : upcomingScheduledMatch.player1Id;
+                    const opponentData = playersMap[opponentId] || { codename: 'Bilinmiyor', archetype: '' };
+                    const opponentName = opponentData.codename;
+                    const OpponentIcon = ARCHETYPE_ICONS[opponentData.archetype] || Sword;
+
+                    const formattedDate = scheduledTime.toLocaleDateString('tr-TR');
+                    const formattedTime = scheduledTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+                    return (
+                      <div className="rounded-3xl bg-[#0b0d11] border border-primary/20 p-6 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                        <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-3 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                          Yaklaşan Müsabaka ({upcomingRound.roundNumber}. Tur)
+                        </p>
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-3 text-white">
+                            <CalendarDays className="w-4 h-4 text-primary" />
+                            <span className="font-bold">{formattedDate} - {formattedTime}</span>
+                          </div>
+                          <div className="flex items-center gap-3 text-white">
+                            <OpponentIcon className="w-4 h-4 text-primary" />
+                            <span>Rakip: <strong className="text-primary">{opponentName}</strong></span>
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
-                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
-                          <Clock3 className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Format</p>
-                          <p className="text-white text-sm font-bold">10+5 Rapid</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-4 rounded-2xl bg-[#0f1115] p-4 border border-white/5">
-                        <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
-                          <Globe className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Platform</p>
-                          <p className="text-white text-sm font-bold">Lichess.org (Çevrimiçi)</p>
-                        </div>
-                      </div>
-                    </div>
-
-                  <div className="rounded-3xl bg-[#111215] border border-primary/10 p-6">
-                    <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold mb-4">Önemli Not</p>
-                    <p className="text-neutral-300 leading-relaxed">Tüm müsabakalar çevrimiçi olarak Lichess.org üzerinden oynanacaktır. Eşleşme linkiniz profil sayfanıza otomatik olarak iletilir. Maç sonuçları sistem tarafından otomatik çekilir.</p>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -267,24 +324,6 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                             <span className="text-neutral-500">Durum</span>
                             <span className="font-semibold text-white uppercase">{player.status}</span>
                           </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
-                      <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-3">Turnuva Detayları</p>
-                      <div className="grid gap-4">
-                        <div className="flex items-center gap-3 text-neutral-300">
-                          <CalendarDays className="w-4 h-4 text-primary" />
-                          <span>21 Mayıs 2026 / 18:00</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-neutral-300">
-                          <Clock3 className="w-4 h-4 text-primary" />
-                          <span>Format: 10+5 Rapid</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-neutral-300">
-                          <Globe className="w-4 h-4 text-primary" />
-                          <span>Platform: Lichess.org</span>
                         </div>
                       </div>
                     </div>

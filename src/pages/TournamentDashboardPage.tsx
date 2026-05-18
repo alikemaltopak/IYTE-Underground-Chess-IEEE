@@ -3,6 +3,7 @@ import {
   Activity, GitBranch, Database, Sparkles, 
   LayoutGrid, Bot, FileDown, CheckCircle2, ChevronRight, AlertCircle,
   Target, Zap, Shield, Grid3X3, AlignVerticalSpaceAround, Sword, Network, Expand, BrainCircuit,
+  Clock3, Globe, CalendarDays,
   type LucideIcon
 } from 'lucide-react';
 import { Navbar } from '../components/Navbar';
@@ -105,6 +106,61 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
               className="absolute left-0 w-full h-[2px] bg-primary/50 shadow-[0_0_15px_#22c55e] z-20 pointer-events-none"
             />
+          </section>
+
+          {/* Tournament Info Section */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="glass-panel border border-white/10 p-8 flex flex-col justify-center">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="rounded-full bg-primary/10 p-4 text-primary">
+                  <Clock3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold">Turnuva Başlangıcı</p>
+                  <h2 className="text-3xl font-bold text-white mt-2 leading-tight">21 Mayıs 2026</h2>
+                </div>
+              </div>
+            </div>
+            
+            <div className="glass-panel border border-white/10 p-8 lg:col-span-2">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex items-center gap-4 rounded-2xl bg-black/40 p-4 border border-white/5">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center shrink-0">
+                    <p className="text-[8px] uppercase text-primary font-bold">MAY</p>
+                    <p className="text-white text-lg font-display leading-none">21</p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>
+                    <p className="text-white text-sm font-bold">21 Mayıs 2026</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 rounded-2xl bg-black/40 p-4 border border-white/5">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
+                    <Clock3 className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Format</p>
+                    <p className="text-white text-sm font-bold">10+5 Rapid</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 rounded-2xl bg-black/40 p-4 border border-white/5">
+                  <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex items-center justify-center shrink-0">
+                    <Globe className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Platform</p>
+                    <p className="text-white text-sm font-bold">Lichess.org</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold mb-2">Önemli Not</p>
+                <p className="text-neutral-400 text-xs leading-relaxed">Tüm müsabakalar çevrimiçi olarak Lichess.org üzerinden oynanacaktır. Eşleşme linkiniz profil sayfanıza otomatik olarak iletilir. Maç sonuçları sistem tarafından otomatik çekilir.</p>
+              </div>
+            </div>
           </section>
 
           {/* Tournament Grid */}
