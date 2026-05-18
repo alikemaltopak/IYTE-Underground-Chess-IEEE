@@ -49,9 +49,9 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
               <p><span className="text-primary">[KURAL 02]: 48S UPLINK</span> — Müsabaka tarihi, saati ve özel Lichess maç linki, başlangıçtan 48 saat önce profil sayfanıza güvenli kanal üzerinden iletilecektir.</p>
               <p><span className="text-primary">[KURAL 03]: RAPID PROTOCOL</span> — Tüm müsabakalar 10+5 (10 dakika + hamle başı 5 saniye artırma) formatında, Lichess altyapısı üzerinden çevrimiçi olarak oynanacaktır.</p>
               <p><span className="text-primary">[KURAL 04]: MERIT REWARDS</span> — Operasyon sonunda ilk 3'e giren operatörler IEEE tarafından ödüllendirilecektir.</p>
-              <p><span className="text-primary">[KURAL 05]: DYNAMIC ARCHITECTURE</span> — Turnuva düzeni ve eşleşme sistemi, katılan operatör sayısına göre sistem tarafından otomatik olarak belirlenecektir. 2 mağlubiyet alan operatör elenecektir.</p>
+              <p><span className="text-primary">[KURAL 05]: DYNAMIC ARCHITECTURE</span> — Turnuva düzeni ve eşleşme sistemi, katılan operatör sayısına göre sistem tarafından otomatik olarak belirlenecektir.</p>
               <p><span className="text-primary">[KURAL 06]: GHOST MATCH</span> — Her eşleşme için sistem tarafından özel bir Lichess linki oluşturulur. Beyaz ve Siyah renk ataması sistem tarafından yapılır. Operatörler sadece kendilerine atanan linke tıklayarak müsabakaya katılır.</p>
-              <p><span className="text-primary">[KURAL 07]: 15DK KATILIM SÜRESİ</span> — Maç linki oluşturulduktan sonra her iki operatörün de 15 dakika içinde bağlantıya tıklayarak müsabakaya katılması zorunludur. Süre dolduğunda katılmayan operatör <span className="text-red-500">HÜKMEN MAĞLUP</span> ilan edilir. Süre bitmeden yetişen operatör kaldığı yerden oynamaya devam eder.</p>
+              <p><span className="text-primary">[KURAL 07]: 15DK KATILIM SÜRESİ</span> — Maç linki oluşturulduktan sonra her iki operatörün de 15 dakika içinde bağlantıya tıklayarak müsabakaya katılması zorunludur. Süre dolduğunda katılmayan operatör <span className="text-red-500">HÜKMEN MAĞLUP</span> ilan edilir.</p>
               <div className="mt-6 p-4 border border-primary/10 bg-primary/5 rounded-sm">
                 <p className="text-[10px] text-primary/70 italic tracking-widest flex items-center gap-2">
                   <Sparkles className="w-4 h-4" /> "Yeraltında her hamle bir iz bırakır, ama sadece en hızlılar hayatta kalır."
@@ -148,7 +148,6 @@ export const RulesPage = ({ onBack, onAccept, view, setView }: { onBack: () => v
               {[
                 { label: "LINK_TIMEOUT (10DK)", status: "HÜKMEN_MAĞLUBİYET", color: "red-500" },
                 { label: "ENGINE_DETECTION", status: "KALICI_BAN", color: "red-500" },
-                { label: "DOUBLE_LOSS_RULE", status: "ELİMİNASYON", color: "red-500" },
                 { label: "TOXIC_BEHAVIOR", status: "DİSKALİFİYE", color: "red-500" }
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center p-4 bg-surface-container-low border border-primary/10">
