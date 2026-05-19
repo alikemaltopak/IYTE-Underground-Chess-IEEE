@@ -226,69 +226,81 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                 <div className="absolute inset-0 bg-gradient-to-t from-[#040404] via-transparent to-transparent pointer-events-none"></div>
                 <div className="flex flex-col gap-6 relative z-10">
                   {(() => {
-                    let upcomingScheduledMatch = null;
-                    let upcomingRound = null;
+                    const upcomingMatches: { match: any, round: any, diffHours: number }[] = [];
+                    let hasFutureMatches = false;
 
                     if (tournament?.rounds && user) {
                       for (const round of tournament.rounds) {
                         if (round.started) continue; // Başlamış turları atla
                         const myMatch = round.matches.find((m: any) => m.player1Id === user.uid || m.player2Id === user.uid);
                         if (myMatch && myMatch.status === 'pending') {
-                          upcomingScheduledMatch = myMatch;
-                          upcomingRound = round;
-                          break; // En yakın maçı bulduk
+                          hasFutureMatches = true;
+                          const dateStr = `${round.date}T${round.time}`;
+                          const scheduledTime = new Date(dateStr);
+                          const now = new Date();
+                          const diffHours = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+                          if (diffHours <= 48) {
+                            upcomingMatches.push({ match: myMatch, round, diffHours });
+                          }
                         }
                       }
                     }
 
-                    if (!upcomingScheduledMatch || !upcomingRound) {
-                      return (
-                        <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
-                          <p className="text-neutral-400 text-sm">Şu an için planlanmış bir müsabaka bulunmuyor.</p>
-                        </div>
-                      );
+                    if (upcomingMatches.length === 0) {
+                      if (hasFutureMatches) {
+                        return (
+                          <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
+                            <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
+                            <p className="text-neutral-400 text-sm">Gelecek müsabaka bilgileri, müsabakaya 48 saat kala açıklanacaktır.</p>
+                          </div>
+                        );
+                      } else {
+                        return (
+                          <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
+                            <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
+                            <p className="text-neutral-400 text-sm">Şu an için planlanmış bir müsabaka bulunmuyor.</p>
+                          </div>
+                        );
+                      }
                     }
 
-                    const dateStr = `${upcomingRound.date}T${upcomingRound.time}`;
-                    const scheduledTime = new Date(dateStr);
-                    const now = new Date();
-                    const diffHours = (scheduledTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-                    if (diffHours > 48) {
-                      return (
-                        <div className="rounded-3xl bg-[#0b0d11] p-6 border border-white/5">
-                          <p className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 font-bold mb-3">Gelecek Müsabaka</p>
-                          <p className="text-neutral-400 text-sm">Gelecek müsabaka bilgileri, müsabakaya 48 saat kala açıklanacaktır.</p>
-                        </div>
-                      );
-                    }
-
-                    const isWhite = upcomingScheduledMatch.player1Id === user.uid;
-                    const opponentId = isWhite ? upcomingScheduledMatch.player2Id : upcomingScheduledMatch.player1Id;
-                    const opponentData = playersMap[opponentId] || { codename: 'Bilinmiyor', archetype: '' };
-                    const opponentName = opponentData.codename;
-                    const OpponentIcon = ARCHETYPE_ICONS[opponentData.archetype] || Sword;
-
-                    const formattedDate = scheduledTime.toLocaleDateString('tr-TR');
-                    const formattedTime = scheduledTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+                    // Yakın tarihli olanı en üstte göstermek için süreye göre sıralıyoruz
+                    upcomingMatches.sort((a, b) => a.diffHours - b.diffHours);
 
                     return (
-                      <div className="rounded-3xl bg-[#0b0d11] border border-primary/20 p-6 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
-                        <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-3 flex items-center gap-2">
-                          <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                          Yaklaşan Müsabaka ({upcomingRound.roundNumber}. Tur)
-                        </p>
-                        <div className="space-y-4">
-                          <div className="flex items-center gap-3 text-white">
-                            <CalendarDays className="w-4 h-4 text-primary" />
-                            <span className="font-bold">{formattedDate} - {formattedTime}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-white">
-                            <OpponentIcon className="w-4 h-4 text-primary" />
-                            <span>Rakip: <strong className="text-primary">{opponentName}</strong></span>
-                          </div>
-                        </div>
+                      <div className="flex flex-col gap-4">
+                        {upcomingMatches.map(({ match, round }) => {
+                          const dateStr = `${round.date}T${round.time}`;
+                          const scheduledTime = new Date(dateStr);
+                          const isWhite = match.player1Id === user.uid;
+                          const opponentId = isWhite ? match.player2Id : match.player1Id;
+                          const opponentData = playersMap[opponentId] || { codename: 'Bilinmiyor', archetype: '' };
+                          const opponentName = opponentData.codename;
+                          const OpponentIcon = ARCHETYPE_ICONS[opponentData.archetype] || Sword;
+
+                          const formattedDate = scheduledTime.toLocaleDateString('tr-TR');
+                          const formattedTime = scheduledTime.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+
+                          return (
+                            <div key={`${round.roundNumber}-${match.player1Id}`} className="rounded-3xl bg-[#0b0d11] border border-primary/20 p-6 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                              <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-3 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                                Yaklaşan Müsabaka ({round.roundNumber}. Tur)
+                              </p>
+                              <div className="space-y-4">
+                                <div className="flex items-center gap-3 text-white">
+                                  <CalendarDays className="w-4 h-4 text-primary" />
+                                  <span className="font-bold">{formattedDate} - {formattedTime}</span>
+                                </div>
+                                <div className="flex items-center gap-3 text-white">
+                                  <OpponentIcon className="w-4 h-4 text-primary" />
+                                  <span>Rakip: <strong className="text-primary">{opponentName}</strong></span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     );
                   })()}
