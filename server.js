@@ -69,7 +69,23 @@ app.post('/api/verify-codename', async (req, res) => {
       }
     });
     
-    const result = JSON.parse(response.text);
+    if (!response || !response.text) {
+      console.log(`[RET SEBEBİ] AI boş yanıt döndü (Güvenlik filtresi olabilir).`);
+      return res.json({ valid: false, reason: "Yapay zeka güvenlik protokolü bu ismi şüpheli buldu." });
+    }
+
+    let result;
+    try {
+      result = JSON.parse(response.text);
+    } catch (parseError) {
+      console.error("JSON Parse Error:", response.text);
+      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        return res.json({ valid: false, reason: "Yapay zeka yanıtı işlenemedi, lütfen başka bir isim deneyin." });
+      }
+    }
     
     console.log(`[SONUÇ] Onaylandı mı?: ${result.valid ? 'EVET (Geçerli)' : 'HAYIR (Reddedildi)'}`);
     if (!result.valid) {
@@ -80,7 +96,8 @@ app.post('/api/verify-codename', async (req, res) => {
 
   } catch (error) {
     console.error("AI Error:", error);
-    res.status(500).json({ valid: false, reason: "Sistem şu an meşgul." });
+    // 500 dönmek yerine valid: false dönüyoruz ki sistem kilitlenmesin
+    res.json({ valid: false, reason: "Yapay zeka sunucuları meşgul veya hata oluştu, lütfen birazdan tekrar deneyin." });
   }
 });
 

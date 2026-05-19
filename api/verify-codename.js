@@ -57,7 +57,8 @@ export default async function handler(req, res) {
     });
 
     if (!response || !response.text) {
-      throw new Error("AI did not return a valid response text.");
+      console.log(`[RET SEBEBİ] AI boş yanıt döndü (Güvenlik filtresi olabilir).`);
+      return res.status(200).json({ valid: false, reason: "Yapay zeka güvenlik protokolü bu ismi şüpheli buldu." });
     }
 
     let result;
@@ -66,11 +67,11 @@ export default async function handler(req, res) {
     } catch (parseError) {
       console.error("JSON Parse Error:", response.text);
       // Fallback if AI doesn't return pure JSON despite the config
-      const jsonMatch = response.text.match(/\{.*\}/s);
+      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         result = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error("Could not parse AI response as JSON.");
+        return res.status(200).json({ valid: false, reason: "Yapay zeka yanıtı işlenemedi, lütfen başka bir isim deneyin." });
       }
     }
 
@@ -83,9 +84,10 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("AI Verification Error:", error);
-    res.status(500).json({ 
+    // 500 yerine 200 dönüyoruz ki kullanıcı tarafında uygulama çökmesin
+    res.status(200).json({ 
       valid: false, 
-      reason: "Merkezi işlem birimi şu an meşgul. Lütfen birazdan tekrar deneyin. (" + error.message + ")" 
+      reason: "Yapay zeka sunucuları meşgul veya hata oluştu (" + error.message + "), lütfen birazdan tekrar deneyin." 
     });
   }
 }
