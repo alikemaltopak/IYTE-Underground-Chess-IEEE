@@ -12,7 +12,7 @@ export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => v
   ];
 
   // Admin yetkisi olan e-posta adresleri artık .env dosyasından çekiliyor
-  const adminEmailsString = process.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
+  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
   const adminEmails = adminEmailsString.split(',').map(e => e.trim());
 
   if (user?.email && adminEmails.includes(user.email)) {
