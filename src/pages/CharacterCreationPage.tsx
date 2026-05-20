@@ -27,6 +27,11 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
 
+  // Sayfanın en üstünden başlamasını sağla
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   // Load existing player data
   useEffect(() => {
     const loadExistingPlayer = async () => {
