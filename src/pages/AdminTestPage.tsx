@@ -22,7 +22,10 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
   }, []);
 
   // Korumalı rota
-  if (user?.email !== 'alikemaltopak@gmail.com') {
+  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
+  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
+
+  if (!user?.email || !adminEmails.includes(user.email)) {
     return (
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
         <ShieldAlert className="w-16 h-16 text-red-500 mb-4" />
