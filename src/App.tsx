@@ -8,6 +8,7 @@ import { UserProfilePage } from './pages/UserProfilePage';
 import { LoginPage } from './pages/LoginPage';
 import { AdminTestPage } from './pages/AdminTestPage';
 import { Loader2 } from 'lucide-react';
+import { GlobalMatchBanner } from './components/GlobalMatchBanner';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -33,27 +34,31 @@ function AppContent() {
   }
 
   // Logged in → normal app flow
-  if (view === 'rules') {
-    return <RulesPage onBack={() => setView('home')} onAccept={() => setView('character-creation')} view={view} setView={setView} />;
-  }
+  const renderView = () => {
+    if (view === 'rules') {
+      return <RulesPage onBack={() => setView('home')} onAccept={() => setView('character-creation')} view={view} setView={setView} />;
+    }
+    if (view === 'character-creation') {
+      return <CharacterCreationPage onBack={() => setView('home')} onEnterTournament={() => setView('tournament-dashboard')} view={view} setView={setView} />;
+    }
+    if (view === 'tournament-dashboard') {
+      return <TournamentDashboardPage onBack={() => setView('home')} view={view} setView={setView} />;
+    }
+    if (view === 'profile') {
+      return <UserProfilePage onBack={() => setView('home')} view={view} setView={setView} />;
+    }
+    if (view === 'admin-test') {
+      return <AdminTestPage view={view} setView={setView} />;
+    }
+    return <HomePage view={view} setView={setView} />;
+  };
 
-  if (view === 'character-creation') {
-    return <CharacterCreationPage onBack={() => setView('home')} onEnterTournament={() => setView('tournament-dashboard')} view={view} setView={setView} />;
-  }
-
-  if (view === 'tournament-dashboard') {
-    return <TournamentDashboardPage onBack={() => setView('home')} view={view} setView={setView} />;
-  }
-
-  if (view === 'profile') {
-    return <UserProfilePage onBack={() => setView('home')} view={view} setView={setView} />;
-  }
-
-  if (view === 'admin-test') {
-    return <AdminTestPage view={view} setView={setView} />;
-  }
-
-  return <HomePage view={view} setView={setView} />;
+  return (
+    <>
+      <GlobalMatchBanner />
+      {renderView()}
+    </>
+  );
 }
 
 export default function App() {

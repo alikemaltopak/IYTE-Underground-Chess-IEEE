@@ -148,59 +148,6 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
 
       <main className="relative z-10 max-w-6xl mx-auto px-6 py-12">
 
-        {/* HAYALET MAÇ UYARISI - Sayfanın en üstünde, kaçırılması imkansız */}
-        {player?.upcomingMatch && (
-          <div className="mb-8 rounded-2xl bg-primary/10 border-2 border-primary p-6 shadow-[0_0_30px_rgba(34,197,94,0.3)] relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-primary animate-pulse" />
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.3em] text-primary font-bold mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-primary inline-block animate-pulse" />
-                  SİSTEM MESAJI: ÇATIŞMA VAKTİ
-                </p>
-                {matchStatus === 'started' ? (
-                  <p className="text-white text-sm mb-1 font-bold">
-                    Maça giriş yaptınız. Lichess üzerinde oynamaya devam edin.
-                  </p>
-                ) : (
-                  <p className="text-white text-sm mb-1">
-                    Sistem sizi bir eşleşmeye atadı. Aşağıdaki butona tıklayarak satranç tahtasına (Lichess) intikal edin.
-                  </p>
-                )}
-                <p className="text-xs text-neutral-400">
-                  Renginiz: <span className="text-primary font-bold">{player.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
-                </p>
-                {countdown && matchStatus !== 'started' && (
-                  <p className={`text-sm font-bold mt-2 font-mono ${countdown.includes('DOLDU') ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
-                    ⏱️ Katılım süresi: {countdown}
-                  </p>
-                )}
-                {matchStatus === 'started' && (
-                  <p className="text-sm font-bold mt-2 font-mono text-blue-400 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-400 inline-block animate-pulse" /> OYNANIYOR
-                  </p>
-                )}
-              </div>
-              <button 
-                onClick={async () => {
-                  try {
-                    const { doc, updateDoc } = await import('firebase/firestore');
-                    const matchRef = doc(db, 'matches', player.matchId!);
-                    await updateDoc(matchRef, {
-                      [`${player.matchColor}Joined`]: true
-                    });
-                  } catch (e) {
-                    console.error("Failed to mark as joined:", e);
-                  }
-                  window.open(player.upcomingMatch, "_blank");
-                }}
-                className="shrink-0 inline-block bg-primary text-black font-black text-xs uppercase tracking-widest py-3 px-8 hover:bg-white transition-colors text-center cursor-pointer"
-              >
-                MAÇ ALANINA GİRİŞ YAP
-              </button>
-            </div>
-          </div>
-        )}
 
         <section className="grid gap-10 lg:grid-cols-2">
           <div className="space-y-6">
