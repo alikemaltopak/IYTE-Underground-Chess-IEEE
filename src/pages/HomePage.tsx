@@ -99,7 +99,7 @@ const TournamentInfo = () => (
           </div>
           <div>
             <p className="text-[10px] text-primary uppercase tracking-[0.4em] font-bold">Turnuva Başlangıcı</p>
-            <h2 className="text-3xl font-bold text-white mt-2 leading-tight">21 Mayıs 2026</h2>
+            <h2 className="text-3xl font-bold text-white mt-2 leading-tight">6 Haziran 2026</h2>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@ const TournamentInfo = () => (
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>
-              <p className="text-white text-sm font-bold">21 Mayıs 2026</p>
+              <p className="text-white text-sm font-bold">6 Haziran 2026</p>
             </div>
           </div>
 
