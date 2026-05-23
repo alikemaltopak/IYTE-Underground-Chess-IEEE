@@ -108,8 +108,8 @@ const TournamentInfo = () => (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center gap-4 rounded-2xl bg-black/40 p-4 border border-white/5">
             <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center shrink-0">
-              <p className="text-[8px] uppercase text-primary font-bold">MAY</p>
-              <p className="text-white text-lg font-display leading-none">21</p>
+              <p className="text-[8px] uppercase text-primary font-bold">JUN</p>
+              <p className="text-white text-lg font-display leading-none">06</p>
             </div>
             <div>
               <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>

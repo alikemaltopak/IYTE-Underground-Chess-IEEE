@@ -5,7 +5,7 @@ export const Footer = () => (
     <SystemStatus />
     <footer className="w-full py-10 px-6 md:px-10 flex flex-col md:flex-row justify-between items-center glass-panel border-t border-outline-variant/30 gap-8">
       <div className="text-on-surface-variant font-bold text-[10px] uppercase tracking-[0.3em]">
-        © 2026 IEEE EA - SECURE TRANSMISSION
+        © 2026 IEEE EA - SECURE TRANSMISSION <span className="text-primary/60 font-mono ml-4 tracking-normal normal-case">| FOR SUPPORT: +90 542 710 05 30</span>
       </div>
       <div className="flex gap-10">
         <a className="text-[10px] uppercase tracking-widest text-on-surface-variant/40 hover:text-primary transition-colors font-bold" href="#">ENCRYPTION_DOCS</a>

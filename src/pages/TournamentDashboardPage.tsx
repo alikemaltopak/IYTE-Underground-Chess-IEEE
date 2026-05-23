@@ -126,8 +126,8 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="flex items-center gap-4 rounded-2xl bg-black/40 p-4 border border-white/5">
                   <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/20 flex flex-col items-center justify-center shrink-0">
-                    <p className="text-[8px] uppercase text-primary font-bold">MAY</p>
-                    <p className="text-white text-lg font-display leading-none">21</p>
+                    <p className="text-[8px] uppercase text-primary font-bold">JUN</p>
+                    <p className="text-white text-lg font-display leading-none">06</p>
                   </div>
                   <div>
                     <p className="text-[9px] uppercase tracking-[0.2em] text-neutral-500 font-bold">Tarih</p>
@@ -371,7 +371,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
 
       <footer className="w-full py-6 px-12 flex flex-col md:flex-row justify-between items-center bg-black/40 border-t border-neutral-900 relative z-50">
         <div className="font-mono text-[10px] uppercase tracking-widest text-neutral-400 font-bold mb-4 md:mb-0">
-          © 2026 IEEE EA - SECURE TRANSMISSION
+          © 2026 IEEE EA - SECURE TRANSMISSION <span className="text-primary/60 font-mono ml-4 tracking-normal normal-case">| FOR SUPPORT: +90 542 710 05 30</span>
         </div>
         <div className="flex gap-8">
           <a className="font-mono text-[10px] uppercase tracking-widest text-neutral-700 hover:text-primary transition-colors opacity-80 hover:opacity-100 font-bold" href="#">ENCRYPTION_DOCS</a>
