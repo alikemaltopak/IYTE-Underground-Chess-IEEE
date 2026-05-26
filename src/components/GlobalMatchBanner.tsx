@@ -101,7 +101,10 @@ export const GlobalMatchBanner = () => {
               )}
             </div>
           </div>
-          <button 
+          <a 
+            href={player.upcomingMatch}
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={async () => {
               try {
                 const matchRef = doc(db, 'matches', player.matchId!);
@@ -111,12 +114,11 @@ export const GlobalMatchBanner = () => {
               } catch (e) {
                 console.error("Failed to mark as joined:", e);
               }
-              window.open(player.upcomingMatch, "_blank");
             }}
-            className="shrink-0 bg-primary text-black font-black text-[10px] md:text-xs uppercase tracking-widest py-2 md:py-3 px-6 hover:bg-white transition-colors text-center cursor-pointer shadow-[0_0_15px_rgba(34,197,94,0.4)]"
+            className="shrink-0 bg-primary text-black font-black text-[10px] md:text-xs uppercase tracking-widest py-2 md:py-3 px-6 hover:bg-white transition-colors text-center cursor-pointer shadow-[0_0_15px_rgba(34,197,94,0.4)] inline-block"
           >
             MAÇ ALANINA GİRİŞ YAP
-          </button>
+          </a>
         </div>
       </div>
     </div>
