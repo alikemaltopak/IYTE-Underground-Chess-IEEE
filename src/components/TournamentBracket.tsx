@@ -131,24 +131,523 @@ function calculateStandings(rounds: TournamentRound[], playerIds: string[]): Sta
     round.matches.forEach(match => {
       if (match.status !== 'completed' || !match.winnerId) return;
       
-      standings[match.player1Id].played++;
-      standings[match.player2Id].played++;
+      if (match.player1Id !== 'BYE' && standings[match.player1Id]) {
+        standings[match.player1Id].played++;
+      }
+      if (match.player2Id !== 'BYE' && standings[match.player2Id]) {
+        standings[match.player2Id].played++;
+      }
 
       if (match.winnerId === 'draw') {
-        standings[match.player1Id].draws++;
-        standings[match.player2Id].draws++;
-        standings[match.player1Id].points += 0.5;
-        standings[match.player2Id].points += 0.5;
+        if (match.player1Id !== 'BYE' && standings[match.player1Id]) {
+          standings[match.player1Id].draws++;
+          standings[match.player1Id].points += 0.5;
+        }
+        if (match.player2Id !== 'BYE' && standings[match.player2Id]) {
+          standings[match.player2Id].draws++;
+          standings[match.player2Id].points += 0.5;
+        }
       } else {
         const loserId = match.winnerId === match.player1Id ? match.player2Id : match.player1Id;
-        standings[match.winnerId].wins++;
-        standings[match.winnerId].points += 1;
-        standings[loserId].losses++;
+        if (standings[match.winnerId]) {
+          standings[match.winnerId].wins++;
+          standings[match.winnerId].points += 1;
+        }
+        if (loserId !== 'BYE' && standings[loserId]) {
+          standings[loserId].losses++;
+        }
       }
     });
   });
 
   return Object.values(standings).sort((a, b) => b.points - a.points || b.wins - a.wins);
+}
+
+// ============ GENERALIZED PAIRING SYSTEM ============
+
+function generateInitialRound(format: string, playerIds: string[]): TournamentRound[] {
+  if (format === 'round_robin') {
+    return generateRoundRobin(playerIds);
+  }
+  
+  const ids = [...playerIds];
+  const isOdd = ids.length % 2 !== 0;
+  
+  let byePlayerId = '';
+  if (isOdd) {
+    byePlayerId = ids.pop()!;
+  }
+  
+  const matches: RoundRobinMatch[] = [];
+  const n = ids.length;
+  for (let i = 0; i < n; i += 2) {
+    matches.push({
+      id: `r1_m${i / 2}`,
+      round: 1,
+      matchIndex: i / 2,
+      player1Id: ids[i],
+      player2Id: ids[i + 1],
+      winnerId: null,
+      status: 'pending'
+    });
+  }
+  
+  if (byePlayerId) {
+    matches.push({
+      id: `r1_bye`,
+      round: 1,
+      matchIndex: 99,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+
+  const startDate = new Date();
+  
+  return [{
+    roundNumber: 1,
+    date: startDate.toISOString().split('T')[0],
+    time: '18:00',
+    started: false,
+    matches
+  }];
+}
+
+function checkTournamentFinished(format: string, rounds: TournamentRound[], playerIds: string[]): boolean {
+  const allMatchesDone = rounds.every(r => r.matches.every(m => m.status === 'completed'));
+  if (!allMatchesDone) return false;
+  
+  if (format === 'round_robin') {
+    return true;
+  }
+  
+  const standings = calculateStandings(rounds, playerIds);
+  
+  if (format === 'swiss') {
+    const required = playerIds.length <= 16 ? 4 : 5;
+    return rounds.length === required;
+  }
+  
+  if (format === 'single_elimination') {
+    const active = standings.filter(s => s.losses === 0);
+    return active.length <= 1;
+  }
+  
+  if (format === 'double_elimination') {
+    const active = standings.filter(s => s.losses < 2);
+    return active.length <= 1;
+  }
+  
+  if (format === 'hybrid') {
+    if (rounds.length < 7) return false; // Swiss (4) + Quarters (1) + Semis (1) + Finals (1) = 7
+    return true;
+  }
+  
+  return false;
+}
+
+function generateNextSwissRound(rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  const standings = calculateStandings(rounds, playerIds);
+  
+  const playedOpponents: Record<string, Set<string>> = {};
+  playerIds.forEach(id => {
+    playedOpponents[id] = new Set<string>();
+  });
+  
+  rounds.forEach(round => {
+    round.matches.forEach(match => {
+      if (match.player1Id !== 'BYE' && match.player2Id !== 'BYE') {
+        playedOpponents[match.player1Id].add(match.player2Id);
+        playedOpponents[match.player2Id].add(match.player1Id);
+      }
+    });
+  });
+
+  const nextRoundNumber = rounds.length + 1;
+  const paired = new Set<string>();
+  const newMatches: RoundRobinMatch[] = [];
+  
+  const sortedPlayers = standings.map(s => s.playerId);
+  
+  const isOdd = sortedPlayers.length % 2 !== 0;
+  if (isOdd) {
+    const playersWithBye = new Set<string>();
+    rounds.forEach(round => {
+      const allPlayersInMatches = new Set(round.matches.flatMap(m => [m.player1Id, m.player2Id]));
+      playerIds.forEach(id => {
+        if (!allPlayersInMatches.has(id)) {
+          playersWithBye.add(id);
+        }
+      });
+    });
+    
+    let byePlayerId = '';
+    for (let i = sortedPlayers.length - 1; i >= 0; i--) {
+      const pid = sortedPlayers[i];
+      if (!playersWithBye.has(pid)) {
+        byePlayerId = pid;
+        break;
+      }
+    }
+    if (!byePlayerId) {
+      byePlayerId = sortedPlayers[sortedPlayers.length - 1];
+    }
+    
+    paired.add(byePlayerId);
+    newMatches.push({
+      id: `r${nextRoundNumber}_bye`,
+      round: nextRoundNumber,
+      matchIndex: 99,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+
+  let matchIdx = 0;
+  for (let i = 0; i < sortedPlayers.length; i++) {
+    const p1 = sortedPlayers[i];
+    if (paired.has(p1)) continue;
+    
+    let p2 = '';
+    for (let j = i + 1; j < sortedPlayers.length; j++) {
+      const candidate = sortedPlayers[j];
+      if (!paired.has(candidate) && !playedOpponents[p1].has(candidate)) {
+        p2 = candidate;
+        break;
+      }
+    }
+    
+    if (!p2) {
+      for (let j = i + 1; j < sortedPlayers.length; j++) {
+        const candidate = sortedPlayers[j];
+        if (!paired.has(candidate)) {
+          p2 = candidate;
+          break;
+        }
+      }
+    }
+    
+    if (p2) {
+      paired.add(p1);
+      paired.add(p2);
+      newMatches.push({
+        id: `r${nextRoundNumber}_m${matchIdx}`,
+        round: nextRoundNumber,
+        matchIndex: matchIdx,
+        player1Id: p1,
+        player2Id: p2,
+        winnerId: null,
+        status: 'pending'
+      });
+      matchIdx++;
+    } else {
+      paired.add(p1);
+      newMatches.push({
+        id: `r${nextRoundNumber}_bye`,
+        round: nextRoundNumber,
+        matchIndex: 99,
+        player1Id: p1,
+        player2Id: 'BYE',
+        winnerId: p1,
+        status: 'completed'
+      });
+    }
+  }
+  
+  return newMatches;
+}
+
+function generateNextSingleEliminationRound(rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  const standings = calculateStandings(rounds, playerIds);
+  const activePlayers = standings.filter(s => s.losses === 0).map(s => s.playerId);
+  
+  const nextRoundNumber = rounds.length + 1;
+  const matches: RoundRobinMatch[] = [];
+  const n = activePlayers.length;
+  
+  if (n <= 1) return [];
+  
+  const isOdd = n % 2 !== 0;
+  let byePlayerId = '';
+  if (isOdd) {
+    byePlayerId = activePlayers[n - 1];
+    activePlayers.pop();
+  }
+  
+  for (let i = 0; i < activePlayers.length; i += 2) {
+    matches.push({
+      id: `r${nextRoundNumber}_m${i / 2}`,
+      round: nextRoundNumber,
+      matchIndex: i / 2,
+      player1Id: activePlayers[i],
+      player2Id: activePlayers[i + 1],
+      winnerId: null,
+      status: 'pending'
+    });
+  }
+  
+  if (byePlayerId) {
+    matches.push({
+      id: `r${nextRoundNumber}_bye`,
+      round: nextRoundNumber,
+      matchIndex: 99,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+  
+  return matches;
+}
+
+function generateNextDoubleEliminationRound(rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  const standings = calculateStandings(rounds, playerIds);
+  
+  const playedOpponents: Record<string, Set<string>> = {};
+  playerIds.forEach(id => {
+    playedOpponents[id] = new Set<string>();
+  });
+  rounds.forEach(round => {
+    round.matches.forEach(match => {
+      if (match.player1Id !== 'BYE' && match.player2Id !== 'BYE') {
+        playedOpponents[match.player1Id].add(match.player2Id);
+        playedOpponents[match.player2Id].add(match.player1Id);
+      }
+    });
+  });
+
+  const nextRoundNumber = rounds.length + 1;
+  const newMatches: RoundRobinMatch[] = [];
+  
+  const winners = standings.filter(s => s.losses === 0).map(s => s.playerId);
+  const losers = standings.filter(s => s.losses === 1).map(s => s.playerId);
+  
+  if (winners.length === 1 && losers.length === 1) {
+    newMatches.push({
+      id: `r${nextRoundNumber}_gf`,
+      round: nextRoundNumber,
+      matchIndex: 0,
+      player1Id: winners[0],
+      player2Id: losers[0],
+      winnerId: null,
+      status: 'pending'
+    });
+    return newMatches;
+  }
+  
+  if (winners.length === 0 && losers.length === 2) {
+    newMatches.push({
+      id: `r${nextRoundNumber}_reset`,
+      round: nextRoundNumber,
+      matchIndex: 0,
+      player1Id: losers[0],
+      player2Id: losers[1],
+      winnerId: null,
+      status: 'pending'
+    });
+    return newMatches;
+  }
+
+  const paired = new Set<string>();
+  let matchIdx = 0;
+  
+  if (winners.length > 1) {
+    const isOdd = winners.length % 2 !== 0;
+    if (isOdd) {
+      const byePlayerId = winners[winners.length - 1];
+      paired.add(byePlayerId);
+      newMatches.push({
+        id: `r${nextRoundNumber}_wbye`,
+        round: nextRoundNumber,
+        matchIndex: 98,
+        player1Id: byePlayerId,
+        player2Id: 'BYE',
+        winnerId: byePlayerId,
+        status: 'completed'
+      });
+    }
+    
+    for (let i = 0; i < winners.length; i++) {
+      const p1 = winners[i];
+      if (paired.has(p1)) continue;
+      
+      let p2 = '';
+      for (let j = i + 1; j < winners.length; j++) {
+        const candidate = winners[j];
+        if (!paired.has(candidate) && !playedOpponents[p1].has(candidate)) {
+          p2 = candidate;
+          break;
+        }
+      }
+      if (!p2) {
+        for (let j = i + 1; j < winners.length; j++) {
+          const candidate = winners[j];
+          if (!paired.has(candidate)) {
+            p2 = candidate;
+            break;
+          }
+        }
+      }
+      
+      if (p2) {
+        paired.add(p1);
+        paired.add(p2);
+        newMatches.push({
+          id: `r${nextRoundNumber}_wm${matchIdx}`,
+          round: nextRoundNumber,
+          matchIndex: matchIdx,
+          player1Id: p1,
+          player2Id: p2,
+          winnerId: null,
+          status: 'pending'
+        });
+        matchIdx++;
+      }
+    }
+  } else if (winners.length === 1) {
+    const byePlayerId = winners[0];
+    paired.add(byePlayerId);
+    newMatches.push({
+      id: `r${nextRoundNumber}_wbye`,
+      round: nextRoundNumber,
+      matchIndex: 98,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+  
+  if (losers.length > 1) {
+    const isOdd = losers.length % 2 !== 0;
+    if (isOdd) {
+      let byePlayerId = '';
+      for (let i = losers.length - 1; i >= 0; i--) {
+        const pid = losers[i];
+        if (!paired.has(pid)) {
+          byePlayerId = pid;
+          break;
+        }
+      }
+      if (byePlayerId) {
+        paired.add(byePlayerId);
+        newMatches.push({
+          id: `r${nextRoundNumber}_lbye`,
+          round: nextRoundNumber,
+          matchIndex: 99,
+          player1Id: byePlayerId,
+          player2Id: 'BYE',
+          winnerId: byePlayerId,
+          status: 'completed'
+        });
+      }
+    }
+    
+    for (let i = 0; i < losers.length; i++) {
+      const p1 = losers[i];
+      if (paired.has(p1)) continue;
+      
+      let p2 = '';
+      for (let j = i + 1; j < losers.length; j++) {
+        const candidate = losers[j];
+        if (!paired.has(candidate) && !playedOpponents[p1].has(candidate)) {
+          p2 = candidate;
+          break;
+        }
+      }
+      if (!p2) {
+        for (let j = i + 1; j < losers.length; j++) {
+          const candidate = losers[j];
+          if (!paired.has(candidate)) {
+            p2 = candidate;
+            break;
+          }
+        }
+      }
+      
+      if (p2) {
+        paired.add(p1);
+        paired.add(p2);
+        newMatches.push({
+          id: `r${nextRoundNumber}_lm${matchIdx}`,
+          round: nextRoundNumber,
+          matchIndex: matchIdx,
+          player1Id: p1,
+          player2Id: p2,
+          winnerId: null,
+          status: 'pending'
+        });
+        matchIdx++;
+      }
+    }
+  } else if (losers.length === 1 && winners.length > 1) {
+    const byePlayerId = losers[0];
+    paired.add(byePlayerId);
+    newMatches.push({
+      id: `r${nextRoundNumber}_lbye`,
+      round: nextRoundNumber,
+      matchIndex: 99,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+
+  return newMatches;
+}
+
+function generateNextHybridRound(rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  if (rounds.length < 4) {
+    return generateNextSwissRound(rounds, playerIds);
+  }
+  
+  const nextRoundNumber = rounds.length + 1;
+  const newMatches: RoundRobinMatch[] = [];
+  
+  if (rounds.length === 4) {
+    const standings = calculateStandings(rounds, playerIds);
+    const top8 = standings.slice(0, 8).map(s => s.playerId);
+    
+    newMatches.push({ id: `r5_m0`, round: 5, matchIndex: 0, player1Id: top8[0], player2Id: top8[7], winnerId: null, status: 'pending' });
+    newMatches.push({ id: `r5_m1`, round: 5, matchIndex: 1, player1Id: top8[3], player2Id: top8[4], winnerId: null, status: 'pending' });
+    newMatches.push({ id: `r5_m2`, round: 5, matchIndex: 2, player1Id: top8[1], player2Id: top8[6], winnerId: null, status: 'pending' });
+    newMatches.push({ id: `r5_m3`, round: 5, matchIndex: 3, player1Id: top8[2], player2Id: top8[5], winnerId: null, status: 'pending' });
+    
+    return newMatches;
+  }
+  
+  const prevRound = rounds[rounds.length - 1];
+  const winners = prevRound.matches.map(m => m.winnerId).filter(id => id && id !== 'draw') as string[];
+  
+  if (winners.length <= 1) return [];
+  
+  for (let i = 0; i < winners.length; i += 2) {
+    newMatches.push({
+      id: `r${nextRoundNumber}_m${i / 2}`,
+      round: nextRoundNumber,
+      matchIndex: i / 2,
+      player1Id: winners[i],
+      player2Id: winners[i + 1],
+      winnerId: null,
+      status: 'pending'
+    });
+  }
+  
+  return newMatches;
+}
+
+function generateNextRoundMatches(format: string, rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  if (format === 'swiss') return generateNextSwissRound(rounds, playerIds);
+  if (format === 'single_elimination') return generateNextSingleEliminationRound(rounds, playerIds);
+  if (format === 'double_elimination') return generateNextDoubleEliminationRound(rounds, playerIds);
+  if (format === 'hybrid') return generateNextHybridRound(rounds, playerIds);
+  return [];
 }
 
 // ============ MAIN COMPONENT ============
@@ -198,7 +697,13 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
     const shuffled = [...registeredPlayers].sort(() => Math.random() - 0.5);
     const playerIds = shuffled.map(p => p.id);
-    const rounds = generateRoundRobin(playerIds);
+    
+    let rounds: TournamentRound[] = [];
+    if (formatInfo.format === 'round_robin') {
+      rounds = generateRoundRobin(playerIds);
+    } else {
+      rounds = generateInitialRound(formatInfo.format, playerIds);
+    }
 
     await setDoc(doc(db, 'tournament', 'current'), {
       format: formatInfo.format,
@@ -382,10 +887,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       }
 
       if (updated) {
-        const allDone = newRounds.every(r => r.matches.every(m => m.status === 'completed'));
+        const isTournamentFinished = checkTournamentFinished(tournament.format, newRounds, tournament.playerIds);
         await updateDoc(doc(db, 'tournament', 'current'), {
           rounds: newRounds,
-          ...(allDone ? { status: 'completed' } : {})
+          ...(isTournamentFinished ? { status: 'completed' } : {})
         });
       }
     };
@@ -406,12 +911,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
     match.winnerId = winnerId;
     match.status = 'completed';
 
-    // Tüm maçlar bitti mi?
-    const allDone = newRounds.every(r => r.matches.every(m => m.status === 'completed'));
-
+    const isTournamentFinished = checkTournamentFinished(tournament.format, newRounds, tournament.playerIds);
     await updateDoc(doc(db, 'tournament', 'current'), {
       rounds: newRounds,
-      ...(allDone ? { status: 'completed' } : {})
+      ...(isTournamentFinished ? { status: 'completed' } : {})
     });
   };
 
@@ -431,6 +934,33 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
     const newRounds = JSON.parse(JSON.stringify(tournament.rounds)) as TournamentRound[];
     newRounds[roundIndex][field] = value;
     await updateDoc(doc(db, 'tournament', 'current'), { rounds: newRounds });
+  };
+
+  // Sonraki tur eşleşmelerini oluştur
+  const generateNextRound = async () => {
+    if (!tournament) return;
+    try {
+      const newMatches = generateNextRoundMatches(tournament.format, tournament.rounds, tournament.playerIds);
+      const nextRoundNumber = tournament.rounds.length + 1;
+      
+      const lastRoundDate = new Date(tournament.rounds[tournament.rounds.length - 1].date);
+      lastRoundDate.setDate(lastRoundDate.getDate() + 1);
+      
+      const newRound: TournamentRound = {
+        roundNumber: nextRoundNumber,
+        date: lastRoundDate.toISOString().split('T')[0],
+        time: '18:00',
+        started: false,
+        matches: newMatches
+      };
+
+      await updateDoc(doc(db, 'tournament', 'current'), {
+        rounds: [...tournament.rounds, newRound],
+        status: 'active'
+      });
+    } catch (e: any) {
+      alert("Sonraki tur oluşturulurken hata: " + e.message);
+    }
   };
 
   // Turnuvayı sıfırla
@@ -770,6 +1300,29 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             </div>
           );
         })}
+
+        {/* Sonraki Tur Eşleştirme Butonu (Dinamik Formatlar İçin) */}
+        {['swiss', 'single_elimination', 'double_elimination', 'hybrid'].includes(tournament.format) && 
+         tournament.status === 'active' && 
+         completedMatches === totalMatches && 
+         !checkTournamentFinished(tournament.format, tournament.rounds, tournament.playerIds) && (
+          <div className="glass-panel border border-primary/20 p-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-primary/5 mt-4">
+            <div>
+              <h4 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                <Radio className="w-4 h-4 animate-pulse" /> SONRAKİ TUR EŞLEŞMELERİ HAZIR
+              </h4>
+              <p className="text-[10px] text-neutral-400 mt-1 uppercase">
+                {tournament.rounds.length}. tur tamamlandı. {tournament.rounds.length + 1}. tur için yeni eşleşmeleri başlatabilirsiniz.
+              </p>
+            </div>
+            <button
+              onClick={generateNextRound}
+              className="w-full md:w-auto bg-primary text-black font-display font-bold uppercase tracking-widest text-xs px-6 py-3 hover:shadow-[0_0_15px_rgba(34,197,94,0.4)] transition-all transform active:scale-95 flex items-center justify-center gap-2 shrink-0"
+            >
+              <Shuffle className="w-4 h-4" /> {tournament.rounds.length + 1}. TURU EŞLEŞTİR VE BAŞLAT
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
