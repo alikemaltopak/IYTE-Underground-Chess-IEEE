@@ -45,6 +45,7 @@ interface Standing {
 interface TournamentBracketProps {
   players: any[];
   getPlayerName: (uid: string) => string;
+  isAdmin?: boolean;
 }
 
 // ============ ROUND ROBIN SCHEDULER (Circle Method) ============
@@ -652,7 +653,7 @@ function generateNextRoundMatches(format: string, rounds: TournamentRound[], pla
 
 // ============ MAIN COMPONENT ============
 
-export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, getPlayerName }) => {
+export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, getPlayerName, isAdmin = false }) => {
   const [tournament, setTournament] = useState<TournamentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [startingRound, setStartingRound] = useState<number | null>(null);
@@ -965,7 +966,12 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
   // Turnuvayı sıfırla
   const resetTournament = async () => {
-    if (!confirm('Turnuva şeması tamamen silinecek. Emin misin?')) return;
+    const firstConfirm = confirm('DİKKAT: Turnuva şeması, tüm tur eşleşmeleri ve puan durumları tamamen silinecektir. Devam etmek istiyor musunuz?');
+    if (!firstConfirm) return;
+
+    const secondConfirm = confirm('SON UYARI: Bu işlem kesinlikle geri alınamaz ve tüm aktif turnuva verileri kaybolacaktır! Sıfırlamak istediğinizden emin misiniz?');
+    if (!secondConfirm) return;
+
     await setDoc(doc(db, 'tournament', 'current'), { deleted: true });
   };
 
@@ -1049,14 +1055,20 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             )}
           </div>
 
-          <button
-            onClick={generateTournament}
-            disabled={registeredPlayers.length < 2}
-            className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 py-4 px-6 font-bold tracking-widest text-sm flex items-center justify-center gap-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            <Shuffle className="w-5 h-5" />
-            TURNUVA OLUŞTUR VE KARIŞTIR
-          </button>
+          {isAdmin ? (
+            <button
+              onClick={generateTournament}
+              disabled={registeredPlayers.length < 2}
+              className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 py-4 px-6 font-bold tracking-widest text-sm flex items-center justify-center gap-3 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Shuffle className="w-5 h-5" />
+              TURNUVA OLUŞTUR VE KARIŞTIR
+            </button>
+          ) : (
+            <div className="bg-primary/5 border border-primary/20 p-6 text-center text-primary font-mono text-xs uppercase tracking-[0.2em]">
+              [SİSTEM UYARISI]: Turnuva henüz başlatılmamıştır. Maçlar başladığında eşleşmeler burada listelenecektir.
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1082,9 +1094,11 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             {polling && <span className="text-primary ml-2 inline-flex items-center gap-1"><Radio className="w-3 h-3 animate-pulse" /> OTO-KONTROL AKTİF (30sn)</span>}
           </p>
         </div>
-        <button onClick={resetTournament} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-4 text-xs font-bold tracking-widest flex items-center gap-2">
-          <Trash2 className="w-3 h-3" /> SIFIRLA
-        </button>
+        {isAdmin && (
+          <button onClick={resetTournament} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-4 text-xs font-bold tracking-widest flex items-center gap-2">
+            <Trash2 className="w-3 h-3" /> SIFIRLA
+          </button>
+        )}
       </div>
 
       {/* Şampiyon Banner */}
@@ -1157,26 +1171,40 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
                 {/* Tarih/Saat */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5">
-                    <Calendar className="w-3 h-3 text-primary" />
-                    <input
-                      type="date"
-                      value={round.date}
-                      onChange={(e) => updateRoundSchedule(rIdx, 'date', e.target.value)}
-                      className="bg-transparent text-xs text-white outline-none"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5">
-                    <Clock className="w-3 h-3 text-primary" />
-                    <input
-                      type="time"
-                      value={round.time}
-                      onChange={(e) => updateRoundSchedule(rIdx, 'time', e.target.value)}
-                      className="bg-transparent text-xs text-white outline-none"
-                    />
-                  </div>
+                  {isAdmin ? (
+                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5">
+                      <Calendar className="w-3 h-3 text-primary" />
+                      <input
+                        type="date"
+                        value={round.date}
+                        onChange={(e) => updateRoundSchedule(rIdx, 'date', e.target.value)}
+                        className="bg-transparent text-xs text-white outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 text-neutral-400">
+                      <Calendar className="w-3 h-3 text-primary" />
+                      <span className="text-xs">{round.date}</span>
+                    </div>
+                  )}
+                  {isAdmin ? (
+                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-3 py-1.5">
+                      <Clock className="w-3 h-3 text-primary" />
+                      <input
+                        type="time"
+                        value={round.time}
+                        onChange={(e) => updateRoundSchedule(rIdx, 'time', e.target.value)}
+                        className="bg-transparent text-xs text-white outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-3 py-1.5 text-neutral-400">
+                      <Clock className="w-3 h-3 text-primary" />
+                      <span className="text-xs">{round.time}</span>
+                    </div>
+                  )}
                   {/* Tur Başlat Butonu */}
-                  {!round.started && !roundCompleted && (
+                  {isAdmin && !round.started && !roundCompleted && (
                     <button
                       onClick={() => startRound(rIdx)}
                       disabled={startingRound !== null}
@@ -1233,10 +1261,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                       )}
                       {/* Player 1 */}
                       <button
-                        onClick={() => !isCompleted && setMatchResult(rIdx, mIdx, match.player1Id)}
-                        disabled={isCompleted}
+                        onClick={() => isAdmin && !isCompleted && setMatchResult(rIdx, mIdx, match.player1Id)}
+                        disabled={isCompleted || !isAdmin}
                         className={`w-full text-left px-4 py-3 text-xs font-bold tracking-wider flex items-center justify-between transition-all ${
-                          p1Won ? 'bg-primary/15 text-primary' : isDraw ? 'bg-yellow-500/10 text-yellow-400' : 'bg-white/5 text-white hover:bg-white/10'
+                          p1Won ? 'bg-primary/15 text-primary' : isDraw ? 'bg-yellow-500/10 text-yellow-400' : `bg-white/5 text-white ${isAdmin && !isCompleted ? 'hover:bg-white/10 cursor-pointer' : 'cursor-default'}`
                         } disabled:cursor-default`}
                       >
                         <span className="flex items-center gap-2">
@@ -1255,10 +1283,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
                       {/* Player 2 */}
                       <button
-                        onClick={() => !isCompleted && setMatchResult(rIdx, mIdx, match.player2Id)}
-                        disabled={isCompleted}
+                        onClick={() => isAdmin && !isCompleted && setMatchResult(rIdx, mIdx, match.player2Id)}
+                        disabled={isCompleted || !isAdmin}
                         className={`w-full text-left px-4 py-3 text-xs font-bold tracking-wider flex items-center justify-between transition-all ${
-                          p2Won ? 'bg-primary/15 text-primary' : isDraw ? 'bg-yellow-500/10 text-yellow-400' : 'bg-white/5 text-white hover:bg-white/10'
+                          p2Won ? 'bg-primary/15 text-primary' : isDraw ? 'bg-yellow-500/10 text-yellow-400' : `bg-white/5 text-white ${isAdmin && !isCompleted ? 'hover:bg-white/10 cursor-pointer' : 'cursor-default'}`
                         } disabled:cursor-default`}
                       >
                         <span className="flex items-center gap-2">
@@ -1271,28 +1299,30 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                       </button>
 
                       {/* Actions */}
-                      <div className="bg-black/40 px-3 py-1.5 flex items-center justify-between">
-                        {!isCompleted ? (
-                          <button
-                            onClick={() => setMatchResult(rIdx, mIdx, 'draw')}
-                            className="text-[9px] text-yellow-500/60 hover:text-yellow-400 font-bold tracking-wider transition-colors"
-                          >
-                            BERABERE
-                          </button>
-                        ) : (
-                          <span className="text-[9px] text-primary/40 font-bold tracking-wider">
-                            {isDraw ? 'BERABERE' : `${getPlayerName(match.winnerId!)} KAZANDI`}
-                          </span>
-                        )}
-                        {isCompleted && (
-                          <button
-                            onClick={() => resetMatchResult(rIdx, mIdx)}
-                            className="text-[9px] text-red-500/40 hover:text-red-400 font-bold tracking-wider transition-colors"
-                          >
-                            GERİ AL
-                          </button>
-                        )}
-                      </div>
+                      {(isAdmin || isCompleted) && (
+                        <div className="bg-black/40 px-3 py-1.5 flex items-center justify-between">
+                          {isAdmin && !isCompleted ? (
+                            <button
+                              onClick={() => setMatchResult(rIdx, mIdx, 'draw')}
+                              className="text-[9px] text-yellow-500/60 hover:text-yellow-400 font-bold tracking-wider transition-colors"
+                            >
+                              BERABERE
+                            </button>
+                          ) : isCompleted ? (
+                            <span className="text-[9px] text-primary/40 font-bold tracking-wider">
+                              {isDraw ? 'BERABERE' : `${getPlayerName(match.winnerId!)} KAZANDI`}
+                            </span>
+                          ) : null}
+                          {isAdmin && isCompleted && (
+                            <button
+                              onClick={() => resetMatchResult(rIdx, mIdx)}
+                              className="text-[9px] text-red-500/40 hover:text-red-400 font-bold tracking-wider transition-colors"
+                            >
+                              GERİ AL
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -1302,7 +1332,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
         })}
 
         {/* Sonraki Tur Eşleştirme Butonu (Dinamik Formatlar İçin) */}
-        {['swiss', 'single_elimination', 'double_elimination', 'hybrid'].includes(tournament.format) && 
+        {isAdmin && ['swiss', 'single_elimination', 'double_elimination', 'hybrid'].includes(tournament.format) && 
          tournament.status === 'active' && 
          completedMatches === totalMatches && 
          !checkTournamentFinished(tournament.format, tournament.rounds, tournament.playerIds) && (

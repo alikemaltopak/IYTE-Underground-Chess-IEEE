@@ -5,6 +5,11 @@ import {
   Mail, Lock, LogIn, UserPlus, AlertCircle, Loader2, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { checkRegistrationClosed } from '../utils/date';
+import { useEffect } from 'react';
+
 
 export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => void }) => {
   const { loginWithEmail, registerWithEmail, loginWithGoogle } = useAuth();
@@ -16,6 +21,31 @@ export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => v
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [tournamentStatus, setTournamentStatus] = useState<string>('setup');
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) {
+        setTournamentStatus(snap.data().status || 'active');
+      } else {
+        setTournamentStatus('setup');
+      }
+    });
+    return unsub;
+  }, []);
+
+  const regClosed = checkRegistrationClosed(tournamentStatus);
+
+  const handleToggleRegister = () => {
+    if (regClosed) {
+      setError('[SİSTEM UYARISI]: Kayıtlar 5 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
+      setIsRegister(false);
+      return;
+    }
+    setIsRegister(!isRegister);
+    setError('');
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +57,11 @@ export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => v
     }
     if (password.length < 6) {
       setError('Şifre en az 6 karakter olmalıdır.');
+      return;
+    }
+
+    if (isRegister && regClosed) {
+      setError('[SİSTEM UYARISI]: Kayıtlar 5 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
       return;
     }
 
@@ -208,14 +243,24 @@ export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => v
           </button>
 
           {/* Toggle */}
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => { setIsRegister(!isRegister); setError(''); }}
-              className="text-[10px] text-white/30 hover:text-primary transition-colors uppercase tracking-widest font-bold"
-            >
-              {isRegister ? 'Zaten hesabın var mı? GİRİŞ YAP' : 'Hesabın yok mu? KAYIT OL'}
-            </button>
-          </div>
+          {!regClosed && (
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={handleToggleRegister}
+                className="text-[10px] text-white/30 hover:text-primary transition-colors uppercase tracking-widest font-bold"
+              >
+                {isRegister ? 'Zaten hesabın var mı? GİRİŞ YAP' : 'Hesabın yok mu? KAYIT OL'}
+              </button>
+            </div>
+          )}
+          {regClosed && (
+            <div className="mt-6 text-center border border-red-500/20 bg-red-500/5 p-3">
+              <p className="text-[9px] text-red-500 font-mono font-bold uppercase tracking-wider leading-relaxed">
+                [KAYITLAR KAPANDI] 5 HAZİRAN İTİBARİYLE YENİ KAYIT ALINMAMAKTADIR. SADECE KAYITLI OYUNCULAR GİRİŞ YAPABİLİR.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer tag */}

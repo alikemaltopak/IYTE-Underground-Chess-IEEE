@@ -266,7 +266,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
 
         {/* TURNUVA ŞEMASI TAB'I */}
         {adminTab === 'bracket' && (
-          <TournamentBracket players={players} getPlayerName={getPlayerName} />
+          <TournamentBracket players={players} getPlayerName={getPlayerName} isAdmin={true} />
         )}
 
         {/* MAÇ YÖNETİMİ TAB'I */}

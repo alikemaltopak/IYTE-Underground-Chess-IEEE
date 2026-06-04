@@ -8,6 +8,10 @@ import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
 import { savePlayer, getPlayer, PlayerData } from '../services/playerService';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { checkRegistrationClosed } from '../utils/date';
+
 
 export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView }: { onBack: () => void, onEnterTournament: () => void, view: any, setView: (v: any) => void }) => {
   const { user } = useAuth();
@@ -26,6 +30,21 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
   const [selectedArchetype, setSelectedArchetype] = useState('CENTER CONTROL');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [tournamentStatus, setTournamentStatus] = useState<string>('setup');
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) {
+        setTournamentStatus(snap.data().status || 'active');
+      } else {
+        setTournamentStatus('setup');
+      }
+    });
+    return unsub;
+  }, []);
+
+  const regClosed = checkRegistrationClosed(tournamentStatus);
+
 
   // Sayfanın en üstünden başlamasını sağla
   useEffect(() => {
@@ -44,6 +63,9 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
           setCodename(player.codename);
           setSelectedArchetype(player.archetype);
           setStudentVerified(true);
+        } else if (regClosed) {
+          // Yeni kayıt kapalı ve profili yoksa anasayfaya yönlendir
+          setView('home');
         }
       } catch (err) {
         console.error('Oyuncu verisi yükleme hatası:', err);
@@ -53,12 +75,18 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
     };
 
     loadExistingPlayer();
-  }, [user]);
+  }, [user, regClosed]);
+
 
   const handleJoinTournament = async () => {
     if (!user) return;
+    if (regClosed && !existingPlayer) {
+      setSaveError('Kayıtlar kapandığı için yeni profil oluşturamazsınız.');
+      return;
+    }
     setSaving(true);
     setSaveError('');
+
     try {
       const result = await savePlayer(user.uid, {
         codename,

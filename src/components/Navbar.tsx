@@ -1,15 +1,51 @@
 import { LayoutGrid, User, Shield, Terminal, Settings, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useState, useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { checkRegistrationClosed } from '../utils/date';
 
 export const Navbar = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
   const { user } = useAuth();
+  const [hasProfile, setHasProfile] = useState<boolean | null>(null);
+  const [tournamentStatus, setTournamentStatus] = useState<string>('setup');
+
+  useEffect(() => {
+    if (!user) {
+      setHasProfile(false);
+      return;
+    }
+    const unsubPlayer = onSnapshot(doc(db, 'players', user.uid), (snap) => {
+      setHasProfile(snap.exists());
+    });
+    const unsubTourney = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) {
+        setTournamentStatus(snap.data().status || 'active');
+      } else {
+        setTournamentStatus('setup');
+      }
+    });
+    return () => {
+      unsubPlayer();
+      unsubTourney();
+    };
+  }, [user]);
+
+  const regClosed = checkRegistrationClosed(tournamentStatus);
+
   const navItems = [
     { id: 'home', label: 'DASHBOARD', icon: LayoutGrid },
     { id: 'profile', label: 'PROFILE', icon: User },
-    { id: 'character-creation', label: 'CHARACTER', icon: Shield },
-    { id: 'tournament-dashboard', label: 'TOURNAMENT', icon: Terminal },
-    { id: 'rules', label: 'PROTOCOL', icon: Settings },
   ];
+
+  if (!regClosed || hasProfile) {
+    navItems.push({ id: 'character-creation', label: 'CHARACTER', icon: Shield });
+  }
+
+  navItems.push(
+    { id: 'tournament-dashboard', label: 'TOURNAMENT', icon: Terminal },
+    { id: 'rules', label: 'PROTOCOL', icon: Settings }
+  );
 
   // Admin yetkisi olan e-posta adresleri artık .env dosyasından çekiliyor
   const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';

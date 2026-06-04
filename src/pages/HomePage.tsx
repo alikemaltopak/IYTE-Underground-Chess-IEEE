@@ -14,80 +14,105 @@ import {
 import { useState, useEffect } from 'react';
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
+import { TournamentBracket } from '../components/TournamentBracket';
+import { subscribeToPlayers } from '../services/playerService';
+import { checkRegistrationClosed } from '../utils/date';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 
-const Hero = ({ onJoinTournament, onReadRules }: { onJoinTournament: () => void, onReadRules: () => void }) => (
-  <section className="relative h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-black">
-    <div className="absolute inset-0 z-0">
-      <img 
-        alt="Cinematic Chess Foreground" 
-        className="w-full h-full object-cover grayscale brightness-[0.2] contrast-125" 
-        src="https://lh3.googleusercontent.com/aida-public/AB6AXuBosOyUH8pfgsxmCCTEUKzWYRbbJXLVMmQOx34TGz7eIZfLXuzAF7o5qhzKxFzw1m09Y1f3hTv98Zp2PvckMjmDaA087C3NxKMcgFLHpdad8Grd-pipxrQHjFVtcl9SJ0no-SXkljYmztQNp-7JeCkMXcwz2wLKJMS7IYUO9gYyyw-h4pf9PuWpNuQt0XHL49J8bHnW8za3f4h_egMlDI4o5cNVSFC0Nt4YtrNFPfTEuAAdAxERDARWtB-Vvi_gkDhveup8PNc08-c"
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/80"></div>
-    </div>
 
-    {/* Volumetric Spotlights - Exactly like screenshot */}
-    <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-      <div className="absolute top-[-10%] left-[35%] w-[100px] h-[120%] bg-white/5 blur-[40px] rotate-1 px-4"></div>
-      <div className="absolute top-[-10%] left-[50%] -translate-x-1/2 w-[120px] h-[120%] bg-white/10 blur-[50px] px-6"></div>
-      <div className="absolute top-[-10%] right-[35%] w-[100px] h-[120%] bg-white/5 blur-[40px] -rotate-1 px-4"></div>
-    </div>
+const Hero = ({ 
+  onJoinTournament, 
+  onReadRules, 
+  regClosed, 
+  hasProfile 
+}: { 
+  onJoinTournament: () => void, 
+  onReadRules: () => void, 
+  regClosed: boolean, 
+  hasProfile: boolean 
+}) => {
+  let btnText = "TURNUVAYA KATIL";
+  if (regClosed) {
+    btnText = hasProfile ? "DASHBOARD'A GİT" : "İZLE // TURNUVA MERKEZİ";
+  }
 
-    <div className="relative z-30 text-center px-6 max-w-5xl translate-y-12">
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="inline-block mb-6 px-4 py-1 border border-primary/40 bg-primary/10 text-[9px] text-primary tracking-[0.3em] font-black"
-      >
-        ENCRYPTED_SIGNAL_DETECTED // VOL 04
-      </motion.div>
-
-      <motion.h1 
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.8 }}
-        className="font-display leading-tight uppercase"
-      >
-        <span className="block text-4xl md:text-6xl text-white font-bold tracking-tighter mb-2">İYTE YERALTI</span>
-        <span className="block text-5xl md:text-8xl text-primary font-black tracking-tighter drop-shadow-[0_0_30px_rgba(74,225,118,0.8)] glow-text">SATRANÇ TURNUVASI</span>
-      </motion.h1>
-
-      <motion.p 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="text-neutral-400 text-sm md:text-lg mt-8 tracking-[0.2em] italic font-medium"
-      >
-        Kimliğin değil, hamlen konuşur.
-      </motion.p>
-
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.8 }}
-        className="flex flex-col md:flex-row gap-6 justify-center items-center mt-12"
-      >
-        <button 
-          onClick={onJoinTournament}
-          className="px-10 py-4 bg-primary text-black font-display text-sm font-black tracking-[0.1em] transition-all hover:bg-white hover:shadow-[0_0_30px_rgba(74,225,118,0.5)]"
-        >
-          TURNUVAYA KATIL
-        </button>
-        <button 
-          onClick={onReadRules}
-          className="px-10 py-4 border border-neutral-600 text-neutral-300 font-display text-sm font-black tracking-[0.1em] hover:bg-white/5 transition-all"
-        >
-          PROTOKOLÜ İNCELE
-        </button>
-      </motion.div>
-
-      <div className="mt-24">
-        <span className="text-[8px] text-neutral-600 tracking-[0.5em] font-bold uppercase animate-pulse">DECRYPT SCROLL</span>
-        <div className="w-px h-12 bg-gradient-to-b from-primary to-transparent mx-auto mt-4"></div>
+  return (
+    <section className="relative h-screen w-full flex flex-col items-center justify-center overflow-hidden bg-black">
+      <div className="absolute inset-0 z-0">
+        <img 
+          alt="Cinematic Chess Foreground" 
+          className="w-full h-full object-cover grayscale brightness-[0.2] contrast-125" 
+          src="https://lh3.googleusercontent.com/aida-public/AB6AXuBosOyUH8pfgsxmCCTEUKzWYRbbJXLVMmQOx34TGz7eIZfLXuzAF7o5qhzKxFzw1m09Y1f3hTv98Zp2PvckMjmDaA087C3NxKMcgFLHpdad8Grd-pipxrQHjFVtcl9SJ0no-SXkljYmztQNp-7JeCkMXcwz2wLKJMS7IYUO9gYyyw-h4pf9PuWpNuQt0XHL49J8bHnW8za3f4h_egMlDI4o5cNVSFC0Nt4YtrNFPfTEuAAdAxERDARWtB-Vvi_gkDhveup8PNc08-c"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/80"></div>
       </div>
-    </div>
-  </section>
-);
+
+      {/* Volumetric Spotlights - Exactly like screenshot */}
+      <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[35%] w-[100px] h-[120%] bg-white/5 blur-[40px] rotate-1 px-4"></div>
+        <div className="absolute top-[-10%] left-[50%] -translate-x-1/2 w-[120px] h-[120%] bg-white/10 blur-[50px] px-6"></div>
+        <div className="absolute top-[-10%] right-[35%] w-[100px] h-[120%] bg-white/5 blur-[40px] -rotate-1 px-4"></div>
+      </div>
+
+      <div className="relative z-30 text-center px-6 max-w-5xl translate-y-12">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="inline-block mb-6 px-4 py-1 border border-primary/40 bg-primary/10 text-[9px] text-primary tracking-[0.3em] font-black"
+        >
+          {regClosed ? "TURNUVA CANLI YAYIN SİNYALİ AKTİF // VOL 04" : "KAYIT SİNYALİ YAKALANDI // VOL 04"}
+        </motion.div>
+
+        <motion.h1 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8 }}
+          className="font-display leading-tight uppercase"
+        >
+          <span className="block text-4xl md:text-6xl text-white font-bold tracking-tighter mb-2">İYTE YERALTI</span>
+          <span className="block text-5xl md:text-8xl text-primary font-black tracking-tighter drop-shadow-[0_0_30px_rgba(74,225,118,0.8)] glow-text">SATRANÇ TURNUVASI</span>
+        </motion.h1>
+
+        <motion.p 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="text-neutral-400 text-sm md:text-lg mt-8 tracking-[0.2em] italic font-medium"
+        >
+          Kimliğin değil, hamlen konuşur.
+        </motion.p>
+
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="flex flex-col md:flex-row gap-6 justify-center items-center mt-12"
+        >
+          <button 
+            onClick={onJoinTournament}
+            className="px-10 py-4 bg-primary text-black font-display text-sm font-black tracking-[0.1em] transition-all hover:bg-white hover:shadow-[0_0_30px_rgba(74,225,118,0.5)]"
+          >
+            {btnText}
+          </button>
+          <button 
+            onClick={onReadRules}
+            className="px-10 py-4 border border-neutral-600 text-neutral-300 font-display text-sm font-black tracking-[0.1em] hover:bg-white/5 transition-all"
+          >
+            PROTOKOLÜ İNCELE
+          </button>
+        </motion.div>
+
+        <div className="mt-24">
+          <span className="text-[8px] text-neutral-600 tracking-[0.5em] font-bold uppercase animate-pulse">DECRYPT SCROLL</span>
+          <div className="w-px h-12 bg-gradient-to-b from-primary to-transparent mx-auto mt-4"></div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 
 const TournamentInfo = () => (
   <section className="py-20 px-6 md:px-10 bg-black border-y border-white/5 relative z-20">
@@ -337,15 +362,88 @@ const Terminal = () => {
 };
 
 export const HomePage = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
+  const { user } = useAuth();
+  const [players, setPlayers] = useState<any[]>([]);
+  const [tournamentStatus, setTournamentStatus] = useState<string>('setup');
+  const [hasProfile, setHasProfile] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsubscribePlayers = subscribeToPlayers((data) => {
+      setPlayers(data);
+    });
+
+    const unsubTourney = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) {
+        setTournamentStatus(snap.data().status || 'active');
+      } else {
+        setTournamentStatus('setup');
+      }
+    });
+
+    return () => {
+      unsubscribePlayers();
+      unsubTourney();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setHasProfile(false);
+      return;
+    }
+    const unsub = onSnapshot(doc(db, 'players', user.uid), (snap) => {
+      setHasProfile(snap.exists());
+    });
+    return unsub;
+  }, [user]);
+
+  const regClosed = checkRegistrationClosed(tournamentStatus);
+
+  const getPlayerName = (uid: string) => {
+    const p = players.find(p => p.uid === uid);
+    return p?.codename || uid;
+  };
+
+  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
+  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
+  const isUserAdmin = !!(user?.email && adminEmails.includes(user.email));
+
   return (
     <div className="min-h-screen selection:bg-primary selection:text-on-primary">
       <Navbar view={view} setView={setView} />
       <main>
         <Hero 
-          onJoinTournament={() => setView('character-creation')}
+          regClosed={regClosed}
+          hasProfile={hasProfile}
+          onJoinTournament={() => {
+            if (regClosed) {
+              setView('tournament-dashboard');
+            } else {
+              setView('character-creation');
+            }
+          }}
           onReadRules={() => setView('rules')} 
         />
-        <TournamentInfo />
+        
+        {regClosed && (
+          <section className="py-20 px-6 md:px-10 bg-black border-y border-white/5 relative z-20">
+            <div className="max-w-7xl mx-auto">
+              <div className="text-center mb-16">
+                <h2 className="font-display text-3xl md:text-5xl text-primary uppercase tracking-wider mb-2 glow-text italic">
+                  CANLI TURNUVA MERKEZİ
+                </h2>
+                <p className="text-[10px] text-primary tracking-widest uppercase font-bold">
+                  [ CANLI YAYIN SİNYALİ AKTİF // REAL-TIME FEED ]
+                </p>
+              </div>
+              <div className="glass-panel border border-white/10 p-6 md:p-10 bg-[#0a0a0a]">
+                <TournamentBracket players={players} getPlayerName={getPlayerName} isAdmin={isUserAdmin} />
+              </div>
+            </div>
+          </section>
+        )}
+        
+        {!regClosed && <TournamentInfo />}
         <About />
         <Protocols />
         <Terminal />
@@ -354,3 +452,4 @@ export const HomePage = ({ view, setView }: { view: string, setView: (v: any) =>
     </div>
   );
 };
+

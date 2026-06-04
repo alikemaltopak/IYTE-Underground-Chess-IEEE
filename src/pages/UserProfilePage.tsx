@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { PlayerData } from '../services/playerService';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { checkRegistrationClosed, parseDeadline } from '../utils/date';
+
 
 const archetypes = [
   { name: 'CENTER CONTROL', desc: 'Merkezi ele geçir, oyunu sen yönlendir. Taşlarının hareket alanını artırırken rakibin seçeneklerini kısıtla. Oyunun temposunu belirleyen temel güç.', img: '/archetype_queen_1777845711451.png' },
@@ -20,8 +22,12 @@ const archetypes = [
   { name: 'PLAN MAKING', desc: 'Plansız hamle yok. Her hareket bir amaca hizmet etmeli. Kazanan oyuncu, düşünen oyuncudur.', img: '/archetype_strategist_1777845727599.png' }
 ];
 
-const archetypeImages: Record<string, string> = {};
-const archetypeDescs: Record<string, string> = {};
+const archetypeImages: Record<string, string> = {
+  'SPECTATOR': '/screen.png'
+};
+const archetypeDescs: Record<string, string> = {
+  'SPECTATOR': 'Turnuvaya katılım yapmadınız veya kayıt süresi doldu. Turnuva maçlarını canlı takip edebilir ve skor tablosunu inceleyebilirsiniz.'
+};
 
 archetypes.forEach(a => {
   archetypeImages[a.name] = a.img;
@@ -38,7 +44,9 @@ const ARCHETYPE_ICONS: Record<string, any> = {
   'COORDINATION': Network,
   'SPACE ADVANTAGE': Expand,
   'PLAN MAKING': BrainCircuit,
+  'SPECTATOR': Shield,
 };
+
 
 export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void; view: any; setView: (v: any) => void }) => {
   const { user, logout } = useAuth();
@@ -46,6 +54,8 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState('');
+  const [tournament, setTournament] = useState<any>(null);
+  const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
     if (!user) return;
@@ -56,8 +66,23 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
     const unsubscribe = onSnapshot(playerRef, (docSnap) => {
       if (docSnap.exists()) {
         setPlayer(docSnap.data() as PlayerData);
+        setError('');
       } else {
-        setError('Karakter bilgisi bulunamadı. Karakter oluşturmak için ana sayfaya dönün.');
+        const isClosed = checkRegistrationClosed(tournament?.status);
+        if (isClosed) {
+          setPlayer({
+            uid: user.uid,
+            codename: 'İZLEYİCİ (SPECTATOR)',
+            studentId: 'N/A',
+            archetype: 'SPECTATOR',
+            email: user.email || '',
+            joinedAt: null,
+            status: 'active'
+          } as any);
+          setError('');
+        } else {
+          setError('Karakter bilgisi bulunamadı. Karakter oluşturmak için ana sayfaya dönün.');
+        }
       }
       setLoading(false);
     }, (err) => {
@@ -67,14 +92,12 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, tournament?.status]);
+
 
   // Geri sayım zamanlayıcısı ve maç durumu
   const [matchStatus, setMatchStatus] = useState<string>('');
   const [matchData, setMatchData] = useState<any>(null);
-
-  const [tournament, setTournament] = useState<any>(null);
-  const [playersMap, setPlayersMap] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const unsubTourney = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
@@ -117,7 +140,12 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
       }
 
       const tick = () => {
-        const remaining = deadline.toDate().getTime() - Date.now();
+        const deadlineTime = parseDeadline(deadline);
+        if (!deadlineTime) {
+          setCountdown('');
+          return;
+        }
+        const remaining = deadlineTime - Date.now();
         if (remaining <= 0) {
           setCountdown('SÜRE DOLDU — Acilen katılın!');
           return;
@@ -179,7 +207,7 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                     if (tournament?.rounds && user) {
                       for (const round of tournament.rounds) {
                         if (round.started) continue; // Başlamış turları atla
-                        const myMatch = round.matches.find((m: any) => m.player1Id === user.uid || m.player2Id === user.uid);
+                        const myMatch = round.matches?.find((m: any) => m.player1Id === user.uid || m.player2Id === user.uid);
                         if (myMatch && myMatch.status === 'pending') {
                           hasFutureMatches = true;
                           const dateStr = `${round.date}T${round.time}`;
