@@ -142,7 +142,7 @@ app.post('/api/create-match', async (req, res) => {
 
 // 2. Maç Sonucunu Kontrol Etme (query parametreli - Vercel uyumlu)
 app.get('/api/match-result', async (req, res) => {
-  const matchId = req.query.matchId;
+  const { matchId, full } = req.query;
   if (!matchId) {
     return res.status(400).json({ success: false, reason: 'matchId gerekli.' });
   }
@@ -160,7 +160,8 @@ app.get('/api/match-result', async (req, res) => {
     res.json({
       success: true,
       status: gameData.status,
-      winner: gameData.winner || 'Beraberlik'
+      winner: gameData.winner || 'Beraberlik',
+      ...(full === 'true' ? { gameData } : {})
     });
   } catch (error) {
     console.error("Fetch Result Error:", error);
@@ -171,6 +172,7 @@ app.get('/api/match-result', async (req, res) => {
 // 2b. Maç Sonucunu Kontrol Etme (path parametreli - geriye uyumluluk)
 app.get('/api/match-result/:matchId', async (req, res) => {
   const { matchId } = req.params;
+  const { full } = req.query;
   try {
     const response = await fetch(`https://lichess.org/game/export/${matchId}`, {
       headers: { 'Accept': 'application/json' }
@@ -188,7 +190,8 @@ app.get('/api/match-result/:matchId', async (req, res) => {
     res.json({
       success: true,
       status: gameData.status, // 'started', 'mate', 'resign', 'draw' vb.
-      winner: gameData.winner || 'Beraberlik' // 'white' veya 'black'
+      winner: gameData.winner || 'Beraberlik', // 'white' veya 'black'
+      ...(full === 'true' ? { gameData } : {})
     });
 
   } catch (error) {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio } from 'lucide-react';
+import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio, X, ExternalLink } from 'lucide-react';
 
 // ============ TYPES ============
 
-interface RoundRobinMatch {
+export interface RoundRobinMatch {
   id: string;
   round: number;
   matchIndex: number;
@@ -17,7 +17,7 @@ interface RoundRobinMatch {
   lichessStatus?: string; // 'created' | 'started' | 'mate' | 'resign' etc.
 }
 
-interface TournamentRound {
+export interface TournamentRound {
   roundNumber: number;
   date: string;
   time: string;
@@ -25,7 +25,7 @@ interface TournamentRound {
   matches: RoundRobinMatch[];
 }
 
-interface TournamentData {
+export interface TournamentData {
   format: string;
   status: 'setup' | 'active' | 'completed';
   rounds: TournamentRound[];
@@ -33,7 +33,7 @@ interface TournamentData {
   createdAt: any;
 }
 
-interface Standing {
+export interface Standing {
   playerId: string;
   wins: number;
   losses: number;
@@ -122,7 +122,7 @@ function detectFormat(playerCount: number) {
 
 // ============ STANDINGS CALCULATOR ============
 
-function calculateStandings(rounds: TournamentRound[], playerIds: string[]): Standing[] {
+export function calculateStandings(rounds: TournamentRound[], playerIds: string[]): Standing[] {
   const standings: Record<string, Standing> = {};
   playerIds.forEach(id => {
     standings[id] = { playerId: id, wins: 0, losses: 0, draws: 0, points: 0, played: 0 };
@@ -661,6 +661,39 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [liveMatches, setLiveMatches] = useState<Record<string, any>>({});
+
+  const [selectedLichessGameId, setSelectedLichessGameId] = useState<string | null>(null);
+  const [gameDetail, setGameDetail] = useState<any>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [errorDetail, setErrorDetail] = useState('');
+
+  useEffect(() => {
+    if (!selectedLichessGameId) {
+      setGameDetail(null);
+      setErrorDetail('');
+      return;
+    }
+
+    setLoadingDetail(true);
+    setErrorDetail('');
+    
+    fetch(`/api/match-result?matchId=${selectedLichessGameId}&full=true`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.gameData) {
+          setGameDetail(data.gameData);
+        } else {
+          setErrorDetail('Lichess üzerinden müsabaka detayları alınamadı.');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        setErrorDetail('Bağlantı hatası oluştu.');
+      })
+      .finally(() => {
+        setLoadingDetail(false);
+      });
+  }, [selectedLichessGameId]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
@@ -1309,9 +1342,19 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                               BERABERE
                             </button>
                           ) : isCompleted ? (
-                            <span className="text-[9px] text-primary/40 font-bold tracking-wider">
-                              {isDraw ? 'BERABERE' : `${getPlayerName(match.winnerId!)} KAZANDI`}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] text-primary/40 font-bold tracking-wider">
+                                {isDraw ? 'BERABERE' : `${getPlayerName(match.winnerId!)} KAZANDI`}
+                              </span>
+                              {match.lichessMatchId && (
+                                <button
+                                  onClick={() => setSelectedLichessGameId(match.lichessMatchId)}
+                                  className="text-[9px] text-primary hover:text-white font-bold tracking-wider transition-colors border border-primary/20 px-2 py-0.5 bg-primary/5 rounded"
+                                >
+                                  DETAYLAR
+                                </button>
+                              )}
+                            </div>
                           ) : null}
                           {isAdmin && isCompleted && (
                             <button
@@ -1351,6 +1394,136 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             >
               <Shuffle className="w-4 h-4" /> {tournament.rounds.length + 1}. TURU EŞLEŞTİR VE BAŞLAT
             </button>
+          </div>
+        )}
+
+        {/* MÜSABAKA DETAY GÜNLÜĞÜ MODALI */}
+        {selectedLichessGameId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+            <div className="relative w-full max-w-2xl bg-[#09090b] border border-primary/30 p-6 md:p-8 rounded-lg shadow-[0_0_50px_rgba(34,197,94,0.15)] overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="absolute inset-0 pointer-events-none opacity-5 chess-grid bg-[size:32px_32px]"></div>
+              <div className="scanline pointer-events-none"></div>
+
+              {/* Modal Header */}
+              <div className="flex justify-between items-start border-b border-white/10 pb-4 mb-4 shrink-0">
+                <div>
+                  <h3 className="text-lg font-display uppercase tracking-widest text-primary italic flex items-center gap-2">
+                    <Swords className="w-5 h-5 text-primary" /> MÜSABAKA DETAY GÜNLÜĞÜ
+                  </h3>
+                  <p className="text-[9px] text-neutral-500 font-mono tracking-widest uppercase mt-1">LICHESS_GAME_ID: {selectedLichessGameId}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedLichessGameId(null)}
+                  className="text-neutral-500 hover:text-white border border-white/5 hover:border-white/10 p-1.5 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                {loadingDetail ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                    <p className="text-[10px] text-primary/60 font-mono uppercase tracking-widest animate-pulse">Sinyal Deşifre Ediliyor...</p>
+                  </div>
+                ) : errorDetail ? (
+                  <div className="text-center py-12">
+                    <p className="text-red-400 text-sm font-bold">{errorDetail}</p>
+                    <p className="text-neutral-500 text-xs mt-2 font-mono">Lütfen daha sonra tekrar deneyin.</p>
+                  </div>
+                ) : gameDetail ? (() => {
+                  // Calculate Duration
+                  const start = gameDetail.createdAt;
+                  const end = gameDetail.lastMoveAt;
+                  let durationText = "Belirlenmedi";
+                  if (start && end) {
+                    const diffMs = end - start;
+                    const diffSecs = Math.floor(diffMs / 1000);
+                    const mins = Math.floor(diffSecs / 60);
+                    const secs = diffSecs % 60;
+                    durationText = `${mins} dakika ${secs} saniye`;
+                  }
+
+                  // Parse moves
+                  const movesArray = gameDetail.moves ? gameDetail.moves.split(' ') : [];
+                  const formattedMoves: string[] = [];
+                  for (let i = 0; i < movesArray.length; i += 2) {
+                    const moveNum = Math.floor(i / 2) + 1;
+                    const wMove = movesArray[i];
+                    const bMove = movesArray[i + 1] || "";
+                    formattedMoves.push(`${moveNum}. ${wMove} ${bMove}`);
+                  }
+
+                  // Translate status
+                  const translateStatus = (s: string) => {
+                    const map: Record<string, string> = {
+                      'mate': 'Şah-Mat (Mat)',
+                      'resign': 'Terk Etme (Resign)',
+                      'outoftime': 'Zaman Aşımı (Out of Time)',
+                      'draw': 'Beraberlik (Draw)',
+                      'stalemate': 'Pat Beraberliği (Stalemate)',
+                      'aborted': 'İptal Edildi (Aborted)',
+                      'variantEnd': 'Varyant Sonu'
+                    };
+                    return map[s] || s.toUpperCase();
+                  };
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                          <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">MÜSABAKA SÜRESİ</p>
+                          <p className="text-xs font-bold text-white">{durationText}</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                          <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">BİTİŞ ŞEKLİ</p>
+                          <p className="text-xs font-bold text-primary">{translateStatus(gameDetail.status)}</p>
+                        </div>
+                        <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                          <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">ZAMAN PROTOKOLÜ</p>
+                          <p className="text-xs font-bold text-white">
+                            {gameDetail.clock ? `${gameDetail.clock.initial / 60}+${gameDetail.clock.increment} Rapid` : 'Yok'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Moves Grid */}
+                      <div className="bg-black border border-white/10 p-4 rounded">
+                        <h4 className="text-[10px] text-primary font-mono tracking-widest uppercase mb-3 pb-2 border-b border-primary/20 flex justify-between items-center">
+                          <span>HAMLE LOGU (PGN_LOG)</span>
+                          <span className="text-neutral-500">{movesArray.length} Hamle</span>
+                        </h4>
+                        <div className="max-h-[200px] overflow-y-auto grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-1.5 font-mono text-xs text-neutral-400">
+                          {formattedMoves.map((m, idx) => (
+                            <div key={idx} className="flex gap-2 hover:text-white transition-colors">
+                              <span className="text-neutral-600 w-6 text-right">{idx + 1}.</span>
+                              <span>{m.split(' ').slice(1).join(' ')}</span>
+                            </div>
+                          ))}
+                          {formattedMoves.length === 0 && (
+                            <div className="col-span-full text-center text-neutral-600 italic py-4">Hamle oynanmadı.</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Lichess URL Link */}
+                      <div className="pt-2">
+                        <a 
+                          href={`https://lichess.org/${selectedLichessGameId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full bg-primary text-black font-display font-bold uppercase tracking-widest text-xs py-3.5 px-6 hover:shadow-[0_0_15px_rgba(74,225,118,0.4)] transition-all flex items-center justify-center gap-2"
+                        >
+                          LICHESS.ORG ÜZERİNDEN İNCELE <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })() : null}
+              </div>
+            </div>
           </div>
         )}
       </div>

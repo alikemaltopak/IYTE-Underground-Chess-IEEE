@@ -9,6 +9,10 @@ import {
 import { Navbar } from '../components/Navbar';
 import { subscribeToPlayers, PlayerData } from '../services/playerService';
 import { useState, useEffect } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
+import { useAuth } from '../context/AuthContext';
+import { TournamentBracket, calculateStandings } from '../components/TournamentBracket';
 
 // Archetype icon & color mapping — mirrors CharacterCreationPage
 const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
@@ -26,14 +30,84 @@ const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
 const ARCHETYPE_KEYS = Object.keys(ARCHETYPE_MAP);
 
 export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () => void, view: any, setView: (v: any) => void }) => {
+  const { user } = useAuth();
   const [players, setPlayers] = useState<PlayerData[]>([]);
+  const [tournament, setTournament] = useState<any>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToPlayers((data) => {
       setPlayers(data);
     });
-    return () => unsubscribe();
+    const unsubTourney = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
+      if (snap.exists() && !snap.data().deleted) setTournament(snap.data());
+      else setTournament(null);
+    });
+    return () => {
+      unsubscribe();
+      unsubTourney();
+    };
   }, []);
+
+  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
+  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
+  const isUserAdmin = !!(user?.email && adminEmails.includes(user.email));
+
+  const getPlayerName = (uid: string) => {
+    const p = players.find(p => p.uid === uid);
+    return p?.codename || uid;
+  };
+
+  const exportToCSV = () => {
+    let csvContent = "\uFEFF"; // UTF-8 BOM to prevent Turkish character issues in Excel
+    
+    if (tournament && tournament.status !== 'setup') {
+      // 1. Standings
+      csvContent += "PUAN DURUMU (STANDINGS)\n";
+      csvContent += "Derece,Kod Adi,Oynanan,Galibiyet,Beraberlik,Maglubiyet,Puan\n";
+      
+      const standings = calculateStandings(tournament.rounds, tournament.playerIds);
+      standings.forEach((s, idx) => {
+        csvContent += `${idx + 1},"${getPlayerName(s.playerId)}",${s.played},${s.wins},${s.draws},${s.losses},${s.points}\n`;
+      });
+      
+      csvContent += "\n\n";
+      
+      // 2. Match History
+      csvContent += "MUSABAKA GECMISI (MATCH HISTORY)\n";
+      csvContent += "Tur,Beyaz Oyuncu,Siyah Oyuncu,Durum,Kazanan,Lichess Linki\n";
+      
+      tournament.rounds.forEach((round) => {
+        round.matches.forEach((match) => {
+          const p1 = getPlayerName(match.player1Id);
+          const p2 = getPlayerName(match.player2Id);
+          const winner = match.winnerId === 'draw' ? 'Beraberlik' : (match.winnerId ? getPlayerName(match.winnerId) : 'Belirlenmedi');
+          const status = match.status === 'completed' ? 'Tamamlandi' : (match.status === 'active' ? 'Oynaniyor' : 'Bekliyor');
+          const link = match.lichessMatchId ? `https://lichess.org/${match.lichessMatchId}` : 'Yok';
+          
+          csvContent += `${round.roundNumber},"${p1}","${p2}",${status},"${winner}",${link}\n`;
+        });
+      });
+    } else {
+      // If tournament hasn't started, export current registered players
+      csvContent += "KAYITLI OPERATÖRLER LİSTESİ\n";
+      csvContent += "Sira,Kod Adi,Oyun Arketigi,Durum\n";
+      
+      players.forEach((p, idx) => {
+        csvContent += `${idx + 1},"${p.codename}","${p.archetype}","${p.status}"\n`;
+      });
+      
+      csvContent += "\n[SISTEM UYARISI]: Turnuva henüz başlatılmamıştır. Maç geçmişi bulunmuyor.\n";
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", "iyte_yeralti_satranc_istatistikleri.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const playerCount = players.length;
 
@@ -262,61 +336,108 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
           </motion.section>
 
           {/* Bracket Preview */}
-          <section className="bg-surface-container-lowest border border-white/5 p-8 relative overflow-hidden">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
-              <div>
-                <h2 className="font-display text-2xl text-primary tracking-tighter uppercase italic">BRACKET_VISUALIZATION_BETA</h2>
-                <p className="text-[10px] text-neutral-600 font-bold tracking-widest">SCHEMATIC RENDER OF FINAL 8 PATHWAY</p>
+          {tournament && tournament.status !== 'setup' ? (
+            <section className="bg-surface-container-lowest border border-white/5 p-8 relative overflow-hidden">
+              <div className="flex justify-end mb-6">
+                <button 
+                  onClick={exportToCSV}
+                  className="border border-neutral-700 px-4 py-2 text-[10px] text-neutral-400 hover:border-primary hover:text-primary transition-colors flex items-center gap-2 font-bold tracking-widest"
+                >
+                  <FileDown className="w-3 h-3" /> EXPORT_DATA
+                </button>
               </div>
-              <button className="border border-neutral-700 px-4 py-2 text-[10px] text-neutral-400 hover:border-primary hover:text-primary transition-colors flex items-center gap-2 font-bold tracking-widest">
-                <FileDown className="w-3 h-3" /> EXPORT_DATA
-              </button>
-            </div>
-            
-            <div className="flex flex-col md:flex-row justify-around items-center min-h-[400px] relative gap-12">
-              {/* Quarter Finals */}
-              <div className="space-y-16 z-10">
-                {[772, 901].map(id => (
-                  <div key={id} className="w-48 h-12 bg-neutral-900 border border-neutral-800 flex items-center px-4 gap-3 relative overflow-hidden">
-                    <div className="w-1 h-full bg-neutral-700 absolute left-0 top-0"></div>
-                    <span className="text-[10px] font-mono text-neutral-600 font-bold">ID_{id}</span>
-                    <span className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold">PENDING...</span>
-                    <div className="absolute -right-8 top-1/2 w-8 h-px bg-primary/30 hidden md:block"></div>
-                  </div>
-                ))}
+              <TournamentBracket players={players} getPlayerName={getPlayerName} isAdmin={isUserAdmin} />
+            </section>
+          ) : (
+            <section className="bg-surface-container-lowest border border-white/5 p-8 relative overflow-hidden">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
+                <div>
+                  <h2 className="font-display text-2xl text-primary tracking-tighter uppercase italic">BRACKET_VISUALIZATION_BETA</h2>
+                  <p className="text-[10px] text-neutral-600 font-bold tracking-widest font-mono">SCHEMATIC RENDER OF FINAL 8 PATHWAY (SIMULATION)</p>
+                </div>
+                <button 
+                  onClick={exportToCSV}
+                  className="border border-neutral-700 px-4 py-2 text-[10px] text-neutral-400 hover:border-primary hover:text-primary transition-colors flex items-center gap-2 font-bold tracking-widest"
+                >
+                  <FileDown className="w-3 h-3" /> EXPORT_DATA
+                </button>
               </div>
-              {/* Connector Bridge */}
-              <div className="hidden md:block absolute left-1/4 top-1/2 -translate-y-1/2 w-1 h-32 border-r border-primary/30"></div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-center min-h-[450px] relative">
+                {/* Column 1: Quarter Finals */}
+                <div className="space-y-6 z-10">
+                  <p className="text-[8px] text-neutral-500 font-mono tracking-widest text-center">QUARTER FINALS</p>
+                  {[
+                    { p1: "OPERATÖR_01", p2: "OPERATÖR_02", winner: "OPERATÖR_01" },
+                    { p1: "OPERATÖR_03", p2: "OPERATÖR_04", winner: "OPERATÖR_03" },
+                    { p1: "OPERATÖR_05", p2: "OPERATÖR_06", winner: "OPERATÖR_06" },
+                    { p1: "OPERATÖR_07", p2: "OPERATÖR_08", winner: "OPERATÖR_07" }
+                  ].map((m, i) => (
+                    <div key={i} className="bg-neutral-900/60 border border-neutral-800 p-2.5 text-xs space-y-1 relative group hover:border-primary/40 transition-colors">
+                      <div className={`px-2 py-1 flex justify-between ${m.winner === m.p1 ? 'text-primary font-bold bg-primary/5' : 'text-neutral-500'}`}>
+                        <span>{m.p1}</span>
+                        <span>{m.winner === m.p1 ? '✓' : ''}</span>
+                      </div>
+                      <div className={`px-2 py-1 flex justify-between ${m.winner === m.p2 ? 'text-primary font-bold bg-primary/5' : 'text-neutral-500'}`}>
+                        <span>{m.p2}</span>
+                        <span>{m.winner === m.p2 ? '✓' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
 
-              {/* Semi Finals */}
-              <div className="space-y-32 z-10">
-                <div className="w-56 h-14 bg-neutral-950 border border-primary/20 flex items-center px-4 gap-3 relative shadow-[0_0_20px_rgba(34,197,94,0.05)]">
-                  <div className="w-1 h-full bg-primary absolute left-0 top-0"></div>
-                  <span className="text-[10px] font-mono text-primary/50 font-bold">MATCH_ALPHA</span>
-                  <span className="text-[10px] text-neutral-300 uppercase tracking-widest font-bold">ENCRYPTED</span>
-                  <div className="absolute -right-8 top-1/2 w-8 h-px bg-primary/30 hidden md:block"></div>
+                {/* Column 2: Semi Finals */}
+                <div className="space-y-16 z-10">
+                  <p className="text-[8px] text-neutral-500 font-mono tracking-widest text-center">SEMI FINALS</p>
+                  {[
+                    { p1: "OPERATÖR_01", p2: "OPERATÖR_03", winner: "OPERATÖR_01" },
+                    { p1: "OPERATÖR_06", p2: "OPERATÖR_07", winner: "OPERATÖR_07" }
+                  ].map((m, i) => (
+                    <div key={i} className="bg-neutral-950/80 border border-primary/20 p-2.5 text-xs space-y-1 relative group hover:border-primary transition-all shadow-[0_0_15px_rgba(34,197,94,0.02)]">
+                      <div className={`px-2 py-1 flex justify-between ${m.winner === m.p1 ? 'text-primary font-bold bg-primary/5' : 'text-neutral-500'}`}>
+                        <span>{m.p1}</span>
+                        <span>{m.winner === m.p1 ? '✓' : ''}</span>
+                      </div>
+                      <div className={`px-2 py-1 flex justify-between ${m.winner === m.p2 ? 'text-primary font-bold bg-primary/5' : 'text-neutral-500'}`}>
+                        <span>{m.p2}</span>
+                        <span>{m.winner === m.p2 ? '✓' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Column 3: Grand Final */}
+                <div className="space-y-32 z-10">
+                  <p className="text-[8px] text-neutral-500 font-mono tracking-widest text-center">GRAND FINAL</p>
+                  <div className="bg-black/90 border-2 border-white/10 p-3.5 text-xs space-y-1 relative group hover:border-primary transition-all">
+                    <div className="px-2 py-1 flex justify-between text-primary font-bold bg-primary/5">
+                      <span>OPERATÖR_01</span>
+                      <span>✓</span>
+                    </div>
+                    <div className="px-2 py-1 flex justify-between text-neutral-500">
+                      <span>OPERATÖR_07</span>
+                      <span></span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 4: Champion */}
+                <div className="z-10 text-center space-y-4">
+                  <p className="text-[8px] text-neutral-500 font-mono tracking-widest">CHAMPION_SLOT</p>
+                  <div className="w-full max-w-[200px] mx-auto h-24 bg-[#050505] border-2 border-primary/40 flex flex-col items-center justify-center relative group hover:border-primary transition-all cursor-crosshair shadow-[0_0_20px_rgba(34,197,94,0.15)]">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,197,94,0.1)_0,transparent_100%)] pointer-events-none" />
+                    <div className="relative z-10 text-center p-2">
+                      <div className="text-[8px] font-bold text-primary mb-1 tracking-widest animate-pulse">ULTIMATE_BREACH</div>
+                      <div className="font-display text-sm tracking-widest text-white uppercase italic font-bold">OPERATÖR_01</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              {/* Grand Final */}
-              <div className="z-10">
-                <div className="w-64 h-24 bg-[#050505] border-2 border-white/10 flex flex-col items-center justify-center relative group hover:border-primary transition-all cursor-crosshair">
-                  <img 
-                    className="absolute inset-0 w-full h-full object-cover opacity-20 grayscale brightness-50" 
-                    src="/regenerated_image_1777643565882.png" 
-                    alt="Champion Slot" 
-                    referrerPolicy="no-referrer" 
-                  />
-                  <div className="relative z-10 text-center">
-                    <div className="text-[10px] font-bold text-neutral-500 mb-1 tracking-widest">ULTIMATE_BREACH</div>
-                    <div className="font-display text-xl tracking-widest text-white uppercase italic">CHAMPION_SLOT</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Fog Effect Layer */}
-            <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-[#050505] to-transparent pointer-events-none"></div>
-          </section>
+              
+              {/* Fog Effect Layer */}
+              <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[#050505] to-transparent pointer-events-none"></div>
+            </section>
+          )}
 
           {/* Archive Section */}
           <motion.section 

@@ -8,7 +8,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { matchId } = req.query;
+  const { matchId, full } = req.query;
 
   if (!matchId) {
     return res.status(400).json({ success: false, reason: 'matchId gerekli.' });
@@ -32,7 +32,8 @@ export default async function handler(req, res) {
     res.json({
       success: true,
       status: gameData.status,
-      winner: gameData.winner || 'Beraberlik'
+      winner: gameData.winner || 'Beraberlik',
+      ...(full === 'true' ? { gameData } : {})
     });
   } catch (error) {
     console.error("Fetch Result Error:", error);
