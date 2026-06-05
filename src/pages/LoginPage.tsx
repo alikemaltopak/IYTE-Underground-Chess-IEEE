@@ -38,7 +38,7 @@ export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => v
 
   const handleToggleRegister = () => {
     if (regClosed) {
-      setError('[SİSTEM UYARISI]: Kayıtlar 5 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
+      setError('[SİSTEM UYARISI]: Kayıtlar 6 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
       setIsRegister(false);
       return;
     }
@@ -61,7 +61,7 @@ export const LoginPage = ({ view, setView }: { view: any; setView: (v: any) => v
     }
 
     if (isRegister && regClosed) {
-      setError('[SİSTEM UYARISI]: Kayıtlar 5 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
+      setError('[SİSTEM UYARISI]: Kayıtlar 6 Haziran itibariyle sonlanmıştır. Yalnızca kayıtlı operatörler giriş yapabilir.');
       return;
     }
 

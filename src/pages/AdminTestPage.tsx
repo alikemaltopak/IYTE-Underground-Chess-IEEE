@@ -10,6 +10,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
   const { user } = useAuth();
   const [players, setPlayers] = useState<any[]>([]);
   const [matches, setMatches] = useState<any[]>([]);
+  const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [matchLoading, setMatchLoading] = useState<string | null>(null);
   const [processLoading, setProcessLoading] = useState<string | null>(null);
@@ -44,7 +45,12 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     const unsubMatches = onSnapshot(collection(db, 'matches'), (snapshot) => {
       setMatches(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    return () => { unsubPlayers(); unsubMatches(); };
+    const unsubTournament = onSnapshot(doc(db, 'tournament', 'current'), (snapshot) => {
+      if (snapshot.exists()) {
+        setTournament(snapshot.data());
+      }
+    });
+    return () => { unsubPlayers(); unsubMatches(); unsubTournament(); };
   }, []);
 
   // === HIZLI MAÇ OLUŞTUR ===
@@ -97,6 +103,38 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     }
   };
 
+  // Yardımcı: Turnuva şemasındaki maçı güncelle
+  const updateTournamentMatchResult = async (lichessMatchId: string, winnerId: string, statusText: string) => {
+    if (!tournament) return;
+    try {
+      const newRounds = JSON.parse(JSON.stringify(tournament.rounds));
+      let found = false;
+      
+      for (const round of newRounds) {
+        for (const m of round.matches) {
+          if (m.lichessMatchId === lichessMatchId) {
+            m.winnerId = winnerId;
+            m.status = 'completed';
+            m.lichessStatus = statusText;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+      
+      if (found) {
+        const allCompleted = newRounds.every((r: any) => r.matches.every((m: any) => m.status === 'completed'));
+        await updateDoc(doc(db, 'tournament', 'current'), {
+          rounds: newRounds,
+          ...(allCompleted ? { status: 'completed' } : {})
+        });
+      }
+    } catch (e) {
+      console.error("Tournament match sync error:", e);
+    }
+  };
+
   // === MAÇ SONUCUNU İŞLE ===
   const handleProcessMatch = async (match: any) => {
     setProcessLoading(match.id);
@@ -110,6 +148,64 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
       }
       
       const data = await res.json();
+
+      const deadlineTime = match.deadline?.seconds 
+        ? match.deadline.seconds * 1000 
+        : (typeof match.deadline?.toDate === 'function' 
+            ? match.deadline.toDate().getTime() 
+            : new Date(match.deadline).getTime());
+      
+      const isExpired = deadlineTime > 0 && Date.now() > deadlineTime;
+
+      // Eğer Lichess'te başlamadıysa ve süre bittiyse otomatik hükmen yap
+      if ((!data.success || data.status === 'created') && isExpired) {
+        const wJoined = match.whiteJoined;
+        const bJoined = match.blackJoined;
+
+        let forfeitWinner = null;
+        let forfeitReason = '';
+        let winnerColor: 'white' | 'black' | 'draw' = 'draw';
+
+        if (wJoined && !bJoined) {
+          forfeitWinner = match.whitePlayerId;
+          forfeitReason = 'Hükmen (Siyah Gelmedi)';
+          winnerColor = 'white';
+        } else if (bJoined && !wJoined) {
+          forfeitWinner = match.blackPlayerId;
+          forfeitReason = 'Hükmen (Beyaz Gelmedi)';
+          winnerColor = 'black';
+        } else {
+          forfeitWinner = 'draw';
+          forfeitReason = 'İkisi de Gelmedi';
+          winnerColor = 'draw';
+        }
+
+        const whiteRef = doc(db, 'players', match.whitePlayerId);
+        const blackRef = doc(db, 'players', match.blackPlayerId);
+        const matchRef = doc(db, 'matches', match.id);
+        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+
+        if (winnerColor === 'white') {
+          await updateDoc(whiteRef, { ...clearFields, wins: increment(1) });
+          await updateDoc(blackRef, { ...clearFields, losses: increment(1) });
+        } else if (winnerColor === 'black') {
+          await updateDoc(whiteRef, { ...clearFields, losses: increment(1) });
+          await updateDoc(blackRef, { ...clearFields, wins: increment(1) });
+        } else {
+          await updateDoc(whiteRef, { ...clearFields, draws: increment(1) });
+          await updateDoc(blackRef, { ...clearFields, draws: increment(1) });
+        }
+
+        await updateDoc(matchRef, { 
+          status: 'completed', 
+          winner: winnerColor, 
+          result: forfeitReason 
+        });
+
+        await updateTournamentMatchResult(match.matchId, forfeitWinner, forfeitReason);
+        alert(`Maç süresi dolduğu için otomatik hükmen sonuçlandırıldı!\nSonuç: ${forfeitReason}`);
+        return;
+      }
 
       if (!data.success || data.status === 'started' || data.status === 'created') {
         alert("Maç henüz bitmedi veya bulunamadı.\nDurum: " + (data.status || 'bilinmiyor'));
@@ -127,6 +223,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         await updateDoc(whiteRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(blackRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${getPlayerName(match.whitePlayerId)} kazandı` });
+        await updateTournamentMatchResult(match.matchId, match.whitePlayerId, data.status || 'completed');
         alert(`Maç bitti! Kazanan: ${getPlayerName(match.whitePlayerId)} (BEYAZ)`);
 
       } else if (data.winner === 'black') {
@@ -134,6 +231,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         await updateDoc(whiteRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(blackRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(matchRef, { status: 'completed', winner: 'black', result: `${getPlayerName(match.blackPlayerId)} kazandı` });
+        await updateTournamentMatchResult(match.matchId, match.blackPlayerId, data.status || 'completed');
         alert(`Maç bitti! Kazanan: ${getPlayerName(match.blackPlayerId)} (SİYAH)`);
 
       } else {
@@ -141,6 +239,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         await updateDoc(whiteRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(blackRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
         await updateDoc(matchRef, { status: 'completed', winner: 'draw', result: 'Beraberlik' });
+        await updateTournamentMatchResult(match.matchId, 'draw', data.status || 'completed');
         alert("Maç berabere bitti!");
       }
 
@@ -199,6 +298,9 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     const matchRef = doc(db, 'matches', match.id);
     const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
 
+    const winnerId = absentColor === 'white' ? match.blackPlayerId : match.whitePlayerId;
+    const forfeitReason = absentColor === 'white' ? 'Hükmen (Beyaz Gelmedi)' : 'Hükmen (Siyah Gelmedi)';
+
     if (absentColor === 'white') {
       await updateDoc(whiteRef, { ...clearFields, losses: increment(1) });
       await updateDoc(blackRef, { ...clearFields, wins: increment(1) });
@@ -208,18 +310,31 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
       await updateDoc(blackRef, { ...clearFields, losses: increment(1) });
       await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${winnerName} kazandı (Hükmen)` });
     }
+
+    // Turnuva şemasını güncelle
+    await updateTournamentMatchResult(match.matchId, winnerId, forfeitReason);
+  };
+
+  // Yardımcı: deadline güvenli milisaniyeye çevir
+  const getDeadlineTime = (deadline: any): number => {
+    if (!deadline) return 0;
+    if (typeof deadline.toDate === 'function') return deadline.toDate().getTime();
+    if (typeof deadline.seconds === 'number') return deadline.seconds * 1000;
+    const parsed = new Date(deadline).getTime();
+    return isNaN(parsed) ? 0 : parsed;
   };
 
   // Yardımcı: deadline geçmiş mi
   const isDeadlinePassed = (match: any) => {
-    if (!match.deadline) return false;
-    return Date.now() > match.deadline.toDate().getTime();
+    const deadlineTime = getDeadlineTime(match.deadline);
+    return deadlineTime > 0 && Date.now() > deadlineTime;
   };
 
   // Yardımcı: kalan süre text
   const getRemainingTime = (match: any) => {
-    if (!match.deadline) return '';
-    const remaining = match.deadline.toDate().getTime() - Date.now();
+    const deadlineTime = getDeadlineTime(match.deadline);
+    if (!deadlineTime) return '';
+    const remaining = deadlineTime - Date.now();
     if (remaining <= 0) return 'SÜRE DOLDU';
     const mins = Math.floor(remaining / 60000);
     const secs = Math.floor((remaining % 60000) / 1000);
@@ -304,6 +419,15 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
                         <p className="text-[10px] text-neutral-500 font-mono">ID: {match.matchId}</p>
                         <span className={`text-[10px] font-bold flex items-center gap-1 ${expired ? 'text-red-400' : 'text-yellow-400'}`}>
                           <Timer className="w-3 h-3" /> {getRemainingTime(match)}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs flex flex-wrap gap-x-4 gap-y-1 font-mono">
+                        <span className="text-neutral-500 uppercase tracking-widest text-[9px] font-bold">Giriş Durumu:</span>
+                        <span className={match.whiteJoined ? 'text-primary font-bold' : 'text-yellow-500'}>
+                          ⬜ {getPlayerName(match.whitePlayerId)}: {match.whiteJoined ? 'GİRİŞ YAPTI ✓' : 'BEKLENİYOR...'}
+                        </span>
+                        <span className={match.blackJoined ? 'text-primary font-bold' : 'text-yellow-500'}>
+                          ⬛ {getPlayerName(match.blackPlayerId)}: {match.blackJoined ? 'GİRİŞ YAPTI ✓' : 'BEKLENİYOR...'}
                         </span>
                       </div>
                     </div>

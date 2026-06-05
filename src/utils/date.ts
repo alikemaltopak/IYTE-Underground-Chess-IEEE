@@ -1,11 +1,11 @@
 /**
  * Timezone-safe registration closure check utility
  * 
- * Deadline: June 5, 2026, 23:59:59 Turkey Standard Time (UTC+3)
+ * Deadline: June 6, 2026, 23:59:59 Turkey Standard Time (UTC+3)
  */
 export const checkRegistrationClosed = (status?: string): boolean => {
-  // 1. Time-based automatic closure: 2026-06-05 23:59:59 UTC+3
-  const deadline = new Date('2026-06-05T23:59:59+03:00').getTime();
+  // 1. Time-based automatic closure: 2026-06-06 23:59:59 UTC+3
+  const deadline = new Date('2026-06-06T23:59:59+03:00').getTime();
   const dateClosed = Date.now() > deadline;
 
   // 2. Status-based closure: if tournament is active or completed, registration is closed.

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio, X, ExternalLink } from 'lucide-react';
 
@@ -857,8 +857,27 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
           const { deleteField } = await import('firebase/firestore');
           const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-          await updateDoc(doc(db, 'players', match.player1Id), clear).catch(() => {});
-          await updateDoc(doc(db, 'players', match.player2Id), clear).catch(() => {});
+
+          if (match.winnerId === 'draw') {
+            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, draws: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, draws: increment(1) }).catch(() => {});
+          } else if (match.winnerId === match.player1Id) {
+            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, wins: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, losses: increment(1) }).catch(() => {});
+          } else {
+            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, losses: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, wins: increment(1) }).catch(() => {});
+          }
+
+          const matchResultText = match.winnerId === 'draw' 
+            ? 'Beraberlik' 
+            : `${getPlayerName(match.winnerId)} kazandı`;
+
+          await updateDoc(doc(db, 'matches', match.lichessMatchId), {
+            status: 'completed',
+            winner: match.winnerId === 'draw' ? 'draw' : (match.winnerId === match.player1Id ? 'white' : 'black'),
+            result: matchResultText
+          }).catch((err) => console.error("Failed to update completed match document:", err));
         } else {
           // Maç henüz bitmedi ama durumu güncelle
           if (match.lichessStatus !== data.status) {
@@ -876,7 +895,13 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
               const matchDoc = await getDoc(doc(db, 'matches', match.lichessMatchId));
               if (matchDoc.exists()) {
                 const mData = matchDoc.data();
-                if (mData.deadline && Date.now() > mData.deadline.toDate().getTime()) {
+                const deadlineTime = mData.deadline?.seconds 
+                  ? mData.deadline.seconds * 1000 
+                  : (typeof mData.deadline?.toDate === 'function' 
+                      ? mData.deadline.toDate().getTime() 
+                      : new Date(mData.deadline).getTime());
+
+                if (deadlineTime && Date.now() > deadlineTime) {
                   // Süre doldu! Kim girdi kim girmedi kontrol et
                   const wJoined = mData.whiteJoined;
                   const bJoined = mData.blackJoined;
@@ -903,8 +928,18 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
                     const { deleteField } = await import('firebase/firestore');
                     const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-                    await updateDoc(doc(db, 'players', match.player1Id), clear).catch(() => {});
-                    await updateDoc(doc(db, 'players', match.player2Id), clear).catch(() => {});
+
+                    if (forfeitWinner === 'draw') {
+                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, draws: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, draws: increment(1) }).catch(() => {});
+                    } else if (forfeitWinner === match.player1Id) {
+                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, wins: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, losses: increment(1) }).catch(() => {});
+                    } else {
+                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, losses: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, wins: increment(1) }).catch(() => {});
+                    }
+
                     await updateDoc(doc(db, 'matches', match.lichessMatchId), {
                        status: 'completed',
                        winner: forfeitWinner === match.player1Id ? 'white' : forfeitWinner === match.player2Id ? 'black' : 'draw',
