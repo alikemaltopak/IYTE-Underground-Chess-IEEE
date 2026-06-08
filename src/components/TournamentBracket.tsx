@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio, X, ExternalLink } from 'lucide-react';
+import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio, X, ExternalLink, AlertTriangle, Hourglass } from 'lucide-react';
 
 // ============ TYPES ============
 
@@ -674,14 +674,36 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       return;
     }
 
+    // Check if the local match is resolved as forfeit or neither player joined
+    const localMatch = liveMatches[selectedLichessGameId];
+    if (localMatch && localMatch.status === 'completed' && (localMatch.result?.includes('Hükmen') || localMatch.result?.includes('Gelmedi'))) {
+      setGameDetail({
+        status: 'forfeit',
+        forfeitResult: localMatch.result,
+        localOnly: true
+      });
+      setLoadingDetail(false);
+      setErrorDetail('');
+      return;
+    }
+
     setLoadingDetail(true);
     setErrorDetail('');
     
     fetch(`/api/match-result?matchId=${selectedLichessGameId}&full=true`)
       .then(res => res.json())
       .then(data => {
-        if (data.success && data.gameData) {
-          setGameDetail(data.gameData);
+        if (data.success) {
+          if (data.status === 'created') {
+            setGameDetail({
+              status: 'created',
+              localOnly: true
+            });
+          } else if (data.gameData) {
+            setGameDetail(data.gameData);
+          } else {
+            setErrorDetail('Lichess üzerinden müsabaka detayları alınamadı.');
+          }
         } else {
           setErrorDetail('Lichess üzerinden müsabaka detayları alınamadı.');
         }
@@ -693,7 +715,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       .finally(() => {
         setLoadingDetail(false);
       });
-  }, [selectedLichessGameId]);
+  }, [selectedLichessGameId, liveMatches]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
@@ -1468,6 +1490,83 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                     <p className="text-neutral-500 text-xs mt-2 font-mono">Lütfen daha sonra tekrar deneyin.</p>
                   </div>
                 ) : gameDetail ? (() => {
+                  if (gameDetail.localOnly) {
+                    const localMatch = liveMatches[selectedLichessGameId];
+                    const p1Name = localMatch ? getPlayerName(localMatch.whitePlayerId) : 'Beyaz Oyuncu';
+                    const p2Name = localMatch ? getPlayerName(localMatch.blackPlayerId) : 'Siyah Oyuncu';
+                    const resultText = localMatch?.result || 'Müsabaka tamamlanmadı';
+
+                    if (gameDetail.status === 'forfeit') {
+                      return (
+                        <div className="space-y-6">
+                          <div className="bg-red-950/20 border border-red-500/30 p-6 rounded-lg text-center space-y-3">
+                            <AlertTriangle className="w-10 h-10 text-red-500 mx-auto animate-pulse" />
+                            <h4 className="text-red-400 font-display font-bold uppercase tracking-widest text-sm">HÜKMEN SONUÇLANMIŞ MAÇ</h4>
+                            <p className="text-xs text-neutral-400 font-mono">
+                              Bu müsabaka oyuncuların katılım durumuna göre hükmen tamamlanmıştır. Lichess üzerinde herhangi bir hamle oynanmamıştır.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                              <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">EŞLEŞME</p>
+                              <p className="text-xs font-bold text-white">{p1Name} vs {p2Name}</p>
+                            </div>
+                            <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                              <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">KARAR / DURUM</p>
+                              <p className="text-xs font-bold text-red-400 uppercase">{resultText}</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <a 
+                              href={`https://lichess.org/${selectedLichessGameId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-display font-bold uppercase tracking-widest text-xs py-3.5 px-6 transition-all flex items-center justify-center gap-2"
+                            >
+                              LICHESS OYUN SAYFASINI AÇ <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    } else if (gameDetail.status === 'created') {
+                      return (
+                        <div className="space-y-6">
+                          <div className="bg-yellow-950/20 border border-yellow-500/30 p-6 rounded-lg text-center space-y-3">
+                            <Hourglass className="w-10 h-10 text-yellow-500 mx-auto animate-pulse" />
+                            <h4 className="text-yellow-400 font-display font-bold uppercase tracking-widest text-sm">MAÇ HENÜZ BAŞLAMADI</h4>
+                            <p className="text-xs text-neutral-400 font-mono">
+                              Oyuncuların lobideki yerlerini alması ve ilk hamleyi yapması bekleniyor. Maç başladığında ve hamle yapıldığında istatistikler ve hamle günlüğü burada görünecektir.
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                              <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">BEYAZ OYUNCU</p>
+                              <p className="text-xs font-bold text-white">{p1Name}</p>
+                            </div>
+                            <div className="bg-white/5 border border-white/5 p-4 rounded text-center">
+                              <p className="text-[8px] text-neutral-500 font-mono tracking-widest mb-1">SİYAH OYUNCU</p>
+                              <p className="text-xs font-bold text-white">{p2Name}</p>
+                            </div>
+                          </div>
+
+                          <div className="pt-2">
+                            <a 
+                              href={`https://lichess.org/${selectedLichessGameId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full bg-primary text-black font-display font-bold uppercase tracking-widest text-xs py-3.5 px-6 hover:shadow-[0_0_15px_rgba(74,225,118,0.4)] transition-all flex items-center justify-center gap-2"
+                            >
+                              LICHESS MAÇ LOBİSİNE GİT <ExternalLink className="w-4 h-4" />
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+
                   // Calculate Duration
                   const start = gameDetail.createdAt;
                   const end = gameDetail.lastMoveAt;
