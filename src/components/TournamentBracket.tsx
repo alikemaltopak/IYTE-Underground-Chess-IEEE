@@ -1209,6 +1209,11 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
   const completedMatches = tournament.rounds.reduce((acc, r) => acc + r.matches.filter(m => m.status === 'completed').length, 0);
   const champion = tournament.status === 'completed' ? standings[0] : null;
 
+  const activePlayerCount = tournament.playerIds.filter((id: string) => {
+    const p = players.find(player => player.id === id || player.uid === id);
+    return p?.status !== 'eliminated';
+  }).length;
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -1219,7 +1224,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
             {tournament.status === 'completed' && <span className="text-yellow-400 text-sm ml-2">(TAMAMLANDI)</span>}
           </h2>
           <p className="text-[10px] text-neutral-500 uppercase tracking-widest mt-1">
-            {formatInfo.label} • {tournament.playerIds.length} Oyuncu • {completedMatches}/{totalMatches} Maç
+            {formatInfo.label} • {activePlayerCount}/{tournament.playerIds.length} Oyuncu • {completedMatches}/{totalMatches} Maç
             {polling && <span className="text-primary ml-2 inline-flex items-center gap-1"><Radio className="w-3 h-3 animate-pulse" /> OTO-KONTROL AKTİF (30sn)</span>}
           </p>
         </div>

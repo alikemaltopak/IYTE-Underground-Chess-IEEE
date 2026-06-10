@@ -110,6 +110,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
   };
 
   const playerCount = players.length;
+  const activePlayerCount = players.filter(p => p.status !== 'eliminated').length;
 
   // Determine active tournament format based on player count
   const getActiveFormat = (count: number): number => {
@@ -166,7 +167,9 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
             </div>
             <div className="relative z-10 mt-6 md:mt-0 text-right">
               <div className="flex items-baseline gap-2">
-                <span className="font-display text-7xl text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.6)]">{playerCount}</span>
+                <span className="font-display text-7xl text-primary drop-shadow-[0_0_12px_rgba(34,197,94,0.6)]">
+                  {activePlayerCount}<span className="text-3xl text-neutral-500 font-bold">/{playerCount}</span>
+                </span>
                 <span className="text-2xl text-neutral-500 font-bold">KATILIMCI</span>
               </div>
               <div className="flex items-center justify-end gap-2 text-primary text-[10px] font-bold tracking-widest">
