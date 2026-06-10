@@ -4,6 +4,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
+export interface PlayerMatchInfo {
+  upcomingMatch?: string;
+  matchId?: string;
+  matchColor?: 'white' | 'black';
+}
+
 export interface PlayerData {
   uid: string;
   codename: string;
@@ -12,7 +18,7 @@ export interface PlayerData {
   email: string;
   joinedAt: Timestamp | null;
   status: 'registered' | 'active' | 'eliminated';
-  // Lichess Hayalet Maç Alanları
+  // Lichess Hayalet Maç Alanları (Artık player_matches koleksiyonunda tutuluyor)
   upcomingMatch?: string;
   matchId?: string;
   matchColor?: 'white' | 'black';

@@ -65,27 +65,25 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
       if (data.success) {
         const { matchId, urlWhite, urlBlack } = data;
 
-        // matches koleksiyonuna kayıt at (15 dk deadline ekle)
+        // matches koleksiyonuna kayıt at (15 dk deadline ekle, urlWhite/urlBlack buraya eklenmiyor)
         const deadline = new Date(Date.now() + 15 * 60 * 1000); // 15 dakika sonra
         await setDoc(doc(db, 'matches', matchId), {
           matchId,
           whitePlayerId: user.uid,
           blackPlayerId: targetPlayer.id,
-          urlWhite,
-          urlBlack,
           status: 'active',
           createdAt: serverTimestamp(),
           deadline: Timestamp.fromDate(deadline)
         });
 
-        // Her iki oyuncunun profiline linkleri yaz
-        await updateDoc(doc(db, 'players', targetPlayer.id), {
+        // Her iki oyuncunun profiline özel koleksiyonda linkleri yaz
+        await setDoc(doc(db, 'player_matches', targetPlayer.id), {
           upcomingMatch: urlBlack,
           matchId: matchId,
           matchColor: 'black'
         });
 
-        await updateDoc(doc(db, 'players', user.uid), {
+        await setDoc(doc(db, 'player_matches', user.uid), {
           upcomingMatch: urlWhite,
           matchId: matchId,
           matchColor: 'white'
@@ -183,17 +181,18 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         const whiteRef = doc(db, 'players', match.whitePlayerId);
         const blackRef = doc(db, 'players', match.blackPlayerId);
         const matchRef = doc(db, 'matches', match.id);
-        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+        await deleteDoc(doc(db, 'player_matches', match.whitePlayerId)).catch(() => {});
+        await deleteDoc(doc(db, 'player_matches', match.blackPlayerId)).catch(() => {});
 
         if (winnerColor === 'white') {
-          await updateDoc(whiteRef, { ...clearFields, wins: increment(1) });
-          await updateDoc(blackRef, { ...clearFields, losses: increment(1) });
+          await updateDoc(whiteRef, { wins: increment(1) });
+          await updateDoc(blackRef, { losses: increment(1) });
         } else if (winnerColor === 'black') {
-          await updateDoc(whiteRef, { ...clearFields, losses: increment(1) });
-          await updateDoc(blackRef, { ...clearFields, wins: increment(1) });
+          await updateDoc(whiteRef, { losses: increment(1) });
+          await updateDoc(blackRef, { wins: increment(1) });
         } else {
-          await updateDoc(whiteRef, { ...clearFields, draws: increment(1) });
-          await updateDoc(blackRef, { ...clearFields, draws: increment(1) });
+          await updateDoc(whiteRef, { draws: increment(1) });
+          await updateDoc(blackRef, { draws: increment(1) });
         }
 
         await updateDoc(matchRef, { 
@@ -218,26 +217,29 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
       const blackRef = doc(db, 'players', match.blackPlayerId);
       const matchRef = doc(db, 'matches', match.id);
 
+      await deleteDoc(doc(db, 'player_matches', match.whitePlayerId)).catch(() => {});
+      await deleteDoc(doc(db, 'player_matches', match.blackPlayerId)).catch(() => {});
+
       if (data.winner === 'white') {
         // Beyaz kazandı
-        await updateDoc(whiteRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
-        await updateDoc(blackRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(whiteRef, { wins: increment(1) });
+        await updateDoc(blackRef, { losses: increment(1) });
         await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${getPlayerName(match.whitePlayerId)} kazandı` });
         await updateTournamentMatchResult(match.matchId, match.whitePlayerId, data.status || 'completed');
         alert(`Maç bitti! Kazanan: ${getPlayerName(match.whitePlayerId)} (BEYAZ)`);
 
       } else if (data.winner === 'black') {
         // Siyah kazandı
-        await updateDoc(whiteRef, { losses: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
-        await updateDoc(blackRef, { wins: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(whiteRef, { losses: increment(1) });
+        await updateDoc(blackRef, { wins: increment(1) });
         await updateDoc(matchRef, { status: 'completed', winner: 'black', result: `${getPlayerName(match.blackPlayerId)} kazandı` });
         await updateTournamentMatchResult(match.matchId, match.blackPlayerId, data.status || 'completed');
         alert(`Maç bitti! Kazanan: ${getPlayerName(match.blackPlayerId)} (SİYAH)`);
 
       } else {
         // Beraberlik
-        await updateDoc(whiteRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
-        await updateDoc(blackRef, { draws: increment(1), upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() });
+        await updateDoc(whiteRef, { draws: increment(1) });
+        await updateDoc(blackRef, { draws: increment(1) });
         await updateDoc(matchRef, { status: 'completed', winner: 'draw', result: 'Beraberlik' });
         await updateTournamentMatchResult(match.matchId, 'draw', data.status || 'completed');
         alert("Maç berabere bitti!");
@@ -256,9 +258,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     if (!confirm(`"${getPlayerName(match.whitePlayerId)} vs ${getPlayerName(match.blackPlayerId)}" maçını silmek istediğine emin misin?`)) return;
     try {
       // Oyuncuların maç bilgilerini temizle
-      const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-      await updateDoc(doc(db, 'players', match.whitePlayerId), clearFields).catch(() => {});
-      await updateDoc(doc(db, 'players', match.blackPlayerId), clearFields).catch(() => {});
+      await deleteDoc(doc(db, 'player_matches', match.whitePlayerId)).catch(() => {});
+      await deleteDoc(doc(db, 'player_matches', match.blackPlayerId)).catch(() => {});
       // Maç kaydını sil
       await deleteDoc(doc(db, 'matches', match.id));
     } catch (err: any) {
@@ -271,9 +272,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     if (!confirm(`Toplam ${matches.length} maç kaydı silinecek. Emin misin?`)) return;
     try {
       for (const match of matches) {
-        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-        await updateDoc(doc(db, 'players', match.whitePlayerId), clearFields).catch(() => {});
-        await updateDoc(doc(db, 'players', match.blackPlayerId), clearFields).catch(() => {});
+        await deleteDoc(doc(db, 'player_matches', match.whitePlayerId)).catch(() => {});
+        await deleteDoc(doc(db, 'player_matches', match.blackPlayerId)).catch(() => {});
         await deleteDoc(doc(db, 'matches', match.id));
       }
     } catch (err: any) {
@@ -296,18 +296,19 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     const whiteRef = doc(db, 'players', match.whitePlayerId);
     const blackRef = doc(db, 'players', match.blackPlayerId);
     const matchRef = doc(db, 'matches', match.id);
-    const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+    await deleteDoc(doc(db, 'player_matches', match.whitePlayerId)).catch(() => {});
+    await deleteDoc(doc(db, 'player_matches', match.blackPlayerId)).catch(() => {});
 
     const winnerId = absentColor === 'white' ? match.blackPlayerId : match.whitePlayerId;
     const forfeitReason = absentColor === 'white' ? 'Hükmen (Beyaz Gelmedi)' : 'Hükmen (Siyah Gelmedi)';
 
     if (absentColor === 'white') {
-      await updateDoc(whiteRef, { ...clearFields, losses: increment(1) });
-      await updateDoc(blackRef, { ...clearFields, wins: increment(1) });
+      await updateDoc(whiteRef, { losses: increment(1) });
+      await updateDoc(blackRef, { wins: increment(1) });
       await updateDoc(matchRef, { status: 'completed', winner: 'black', result: `${winnerName} kazandı (Hükmen)` });
     } else {
-      await updateDoc(whiteRef, { ...clearFields, wins: increment(1) });
-      await updateDoc(blackRef, { ...clearFields, losses: increment(1) });
+      await updateDoc(whiteRef, { wins: increment(1) });
+      await updateDoc(blackRef, { losses: increment(1) });
       await updateDoc(matchRef, { status: 'completed', winner: 'white', result: `${winnerName} kazandı (Hükmen)` });
     }
 
@@ -522,40 +523,41 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
                 </div>
 
                 {/* Aktif maç varsa bilgi göster + iptal butonu */}
-                {player.upcomingMatch && (
-                  <div className="mb-4 space-y-2">
-                    <div className="bg-primary/10 border border-primary/20 p-2 rounded text-xs text-primary flex items-center gap-2">
-                      <LinkIcon className="w-3 h-3" /> Aktif Maç Bekliyor
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
-                        await updateDoc(doc(db, 'players', player.id), clearFields);
-                      }}
-                      className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-[10px] font-bold tracking-widest flex items-center justify-center gap-2"
-                    >
-                      <Trash2 className="w-3 h-3" /> MAÇI İPTAL ET
-                    </button>
-                  </div>
-                )}
+                {(() => {
+                  const playerActiveMatch = matches.find(m => m.status === 'active' && (m.whitePlayerId === player.id || m.blackPlayerId === player.id));
+                  if (playerActiveMatch) {
+                    return (
+                      <div className="mb-4 space-y-2">
+                        <div className="bg-primary/10 border border-primary/20 p-2 rounded text-xs text-primary flex items-center gap-2">
+                          <LinkIcon className="w-3 h-3" /> Aktif Maç Bekliyor
+                        </div>
+                        <button
+                          onClick={() => handleDeleteMatch(playerActiveMatch)}
+                          className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-3 text-[10px] font-bold tracking-widest flex items-center justify-center gap-2"
+                        >
+                          <Trash2 className="w-3 h-3" /> MAÇI İPTAL ET
+                        </button>
+                      </div>
+                    );
+                  }
 
-                {/* Hızlı maç butonu — sadece aktif maçı yoksa */}
-                {!player.upcomingMatch && (
-                  <button 
-                    onClick={() => handleQuickMatch(player)}
-                    disabled={matchLoading === player.id}
-                    className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 py-2.5 px-4 font-bold tracking-widest text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {matchLoading === player.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Swords className="w-4 h-4" />
-                        HIZLI MAÇ
-                      </>
-                    )}
-                  </button>
-                )}
+                  return (
+                    <button 
+                      onClick={() => handleQuickMatch(player)}
+                      disabled={matchLoading === player.id}
+                      className="w-full bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 py-2.5 px-4 font-bold tracking-widest text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {matchLoading === player.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Swords className="w-4 h-4" />
+                          HIZLI MAÇ
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
             ))}
             

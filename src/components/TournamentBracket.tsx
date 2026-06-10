@@ -790,24 +790,22 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
         match.lichessMatchId = data.matchId;
         match.status = 'active';
 
-        // Oyuncuların profillerine linkleri yaz
+        // Oyuncuların profillerine özel koleksiyonda linkleri yaz
         const deadline = Timestamp.fromDate(new Date(Date.now() + 15 * 60 * 1000));
-        const { doc: fdoc, updateDoc: fupdate } = await import('firebase/firestore');
+        const { doc: fdoc, setDoc: fset } = await import('firebase/firestore');
 
-        await updateDoc(doc(db, 'players', match.player1Id), {
+        await fset(fdoc(db, 'player_matches', match.player1Id), {
           upcomingMatch: data.urlWhite, matchId: data.matchId, matchColor: 'white'
         });
-        await updateDoc(doc(db, 'players', match.player2Id), {
+        await fset(fdoc(db, 'player_matches', match.player2Id), {
           upcomingMatch: data.urlBlack, matchId: data.matchId, matchColor: 'black'
         });
 
-        // matches koleksiyonuna da kaydet
+        // matches koleksiyonuna da kaydet (urlWhite ve urlBlack buraya kaydedilmiyor, sızıntı önlendi)
         await setDoc(doc(db, 'matches', data.matchId), {
           matchId: data.matchId,
           whitePlayerId: match.player1Id,
           blackPlayerId: match.player2Id,
-          urlWhite: data.urlWhite,
-          urlBlack: data.urlBlack,
           status: 'active',
           createdAt: serverTimestamp(),
           deadline,
@@ -877,18 +875,19 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
           match.lichessStatus = data.status;
           updated = true;
 
-          const { deleteField } = await import('firebase/firestore');
-          const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+          const { deleteDoc, doc: fdoc } = await import('firebase/firestore');
+          await deleteDoc(fdoc(db, 'player_matches', match.player1Id)).catch(() => {});
+          await deleteDoc(fdoc(db, 'player_matches', match.player2Id)).catch(() => {});
 
           if (match.winnerId === 'draw') {
-            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, draws: increment(1) }).catch(() => {});
-            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, draws: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player1Id), { draws: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { draws: increment(1) }).catch(() => {});
           } else if (match.winnerId === match.player1Id) {
-            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, wins: increment(1) }).catch(() => {});
-            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, losses: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player1Id), { wins: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { losses: increment(1) }).catch(() => {});
           } else {
-            await updateDoc(doc(db, 'players', match.player1Id), { ...clear, losses: increment(1) }).catch(() => {});
-            await updateDoc(doc(db, 'players', match.player2Id), { ...clear, wins: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player1Id), { losses: increment(1) }).catch(() => {});
+            await updateDoc(doc(db, 'players', match.player2Id), { wins: increment(1) }).catch(() => {});
           }
 
           const matchResultText = match.winnerId === 'draw' 
@@ -948,18 +947,19 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
                     match.lichessStatus = forfeitReason;
                     updated = true;
 
-                    const { deleteField } = await import('firebase/firestore');
-                    const clear = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+                    const { deleteDoc, doc: fdoc } = await import('firebase/firestore');
+                    await deleteDoc(fdoc(db, 'player_matches', match.player1Id)).catch(() => {});
+                    await deleteDoc(fdoc(db, 'player_matches', match.player2Id)).catch(() => {});
 
                     if (forfeitWinner === 'draw') {
-                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, draws: increment(1) }).catch(() => {});
-                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, draws: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player1Id), { draws: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { draws: increment(1) }).catch(() => {});
                     } else if (forfeitWinner === match.player1Id) {
-                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, wins: increment(1) }).catch(() => {});
-                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, losses: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player1Id), { wins: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { losses: increment(1) }).catch(() => {});
                     } else {
-                      await updateDoc(doc(db, 'players', match.player1Id), { ...clear, losses: increment(1) }).catch(() => {});
-                      await updateDoc(doc(db, 'players', match.player2Id), { ...clear, wins: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player1Id), { losses: increment(1) }).catch(() => {});
+                      await updateDoc(doc(db, 'players', match.player2Id), { wins: increment(1) }).catch(() => {});
                     }
 
                     await updateDoc(doc(db, 'matches', match.lichessMatchId), {

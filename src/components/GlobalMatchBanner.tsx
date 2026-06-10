@@ -6,18 +6,20 @@ import { PlayerData } from '../services/playerService';
 
 export const GlobalMatchBanner = () => {
   const { user } = useAuth();
-  const [player, setPlayer] = useState<PlayerData | null>(null);
+  const [matchLinkInfo, setMatchLinkInfo] = useState<{ upcomingMatch?: string; matchId?: string; matchColor?: 'white' | 'black' } | null>(null);
   const [matchStatus, setMatchStatus] = useState<string>('');
   const [countdown, setCountdown] = useState('');
   const forfeitTriggeredRef = useRef(false);
 
-  // Oyuncu verisini dinle
+  // Oyuncu eşleşme verisini dinle (player_matches koleksiyonundan, güvenlik için)
   useEffect(() => {
     if (!user) return;
-    const playerRef = doc(db, 'players', user.uid);
-    const unsubscribe = onSnapshot(playerRef, (docSnap) => {
+    const matchLinkRef = doc(db, 'player_matches', user.uid);
+    const unsubscribe = onSnapshot(matchLinkRef, (docSnap) => {
       if (docSnap.exists()) {
-        setPlayer(docSnap.data() as PlayerData);
+        setMatchLinkInfo(docSnap.data() as any);
+      } else {
+        setMatchLinkInfo(null);
       }
     });
     return () => unsubscribe();
@@ -25,14 +27,14 @@ export const GlobalMatchBanner = () => {
 
   // Maç verisini dinle
   useEffect(() => {
-    if (!player?.matchId) {
+    if (!matchLinkInfo?.matchId) {
       setCountdown('');
       setMatchStatus('');
       forfeitTriggeredRef.current = false;
       return;
     }
 
-    const matchRef = doc(db, 'matches', player.matchId);
+    const matchRef = doc(db, 'matches', matchLinkInfo.matchId);
     const unsubMatch = onSnapshot(matchRef, (snap) => {
       if (!snap.exists()) return;
       const data = snap.data();
@@ -59,7 +61,7 @@ export const GlobalMatchBanner = () => {
           setCountdown('SÜRE DOLDU — Hükmen Değerlendiriliyor...');
           if (!forfeitTriggeredRef.current && user) {
             forfeitTriggeredRef.current = true;
-            triggerAutoForfeit(player.matchId!, user.uid);
+            triggerAutoForfeit(matchLinkInfo.matchId!, user.uid);
           }
           return;
         }
@@ -73,7 +75,7 @@ export const GlobalMatchBanner = () => {
     });
 
     return () => unsubMatch();
-  }, [player?.matchId, user]);
+  }, [matchLinkInfo?.matchId, user]);
 
   const triggerAutoForfeit = async (matchId: string, currentUid: string) => {
     try {
@@ -116,21 +118,22 @@ export const GlobalMatchBanner = () => {
         winnerColor = 'draw';
       }
       
-      // 4. İstatistikleri ve player kayıtlarını temizle/güncelle
+      // 4. İstatistikleri güncelle ve player_matches kayıtlarını temizle
       const whiteRef = doc(db, 'players', mData.whitePlayerId);
       const blackRef = doc(db, 'players', mData.blackPlayerId);
-      const { deleteField } = await import('firebase/firestore');
-      const clearFields = { upcomingMatch: deleteField(), matchId: deleteField(), matchColor: deleteField() };
+      const { deleteDoc } = await import('firebase/firestore');
+      await deleteDoc(doc(db, 'player_matches', mData.whitePlayerId)).catch(() => {});
+      await deleteDoc(doc(db, 'player_matches', mData.blackPlayerId)).catch(() => {});
       
       if (winnerColor === 'white') {
-        await updateDoc(whiteRef, { ...clearFields, wins: increment(1) }).catch(() => {});
-        await updateDoc(blackRef, { ...clearFields, losses: increment(1) }).catch(() => {});
+        await updateDoc(whiteRef, { wins: increment(1) }).catch(() => {});
+        await updateDoc(blackRef, { losses: increment(1) }).catch(() => {});
       } else if (winnerColor === 'black') {
-        await updateDoc(whiteRef, { ...clearFields, losses: increment(1) }).catch(() => {});
-        await updateDoc(blackRef, { ...clearFields, wins: increment(1) }).catch(() => {});
+        await updateDoc(whiteRef, { losses: increment(1) }).catch(() => {});
+        await updateDoc(blackRef, { wins: increment(1) }).catch(() => {});
       } else {
-        await updateDoc(whiteRef, { ...clearFields, draws: increment(1) }).catch(() => {});
-        await updateDoc(blackRef, { ...clearFields, draws: increment(1) }).catch(() => {});
+        await updateDoc(whiteRef, { draws: increment(1) }).catch(() => {});
+        await updateDoc(blackRef, { draws: increment(1) }).catch(() => {});
       }
       
       // 5. Matches kaydını kapat
@@ -175,7 +178,7 @@ export const GlobalMatchBanner = () => {
     }
   };
 
-  if (!player?.upcomingMatch || matchStatus === 'completed') return null;
+  if (!matchLinkInfo?.upcomingMatch || matchStatus === 'completed') return null;
 
   return (
     <div className="fixed top-16 left-0 w-full z-40 bg-[#050505]/95 backdrop-blur-xl border-b border-primary/30 p-4 md:px-10 shadow-[0_10px_30px_rgba(34,197,94,0.15)] flex justify-center">
@@ -198,7 +201,7 @@ export const GlobalMatchBanner = () => {
             )}
             <div className="flex items-center gap-4 mt-2">
               <p className="text-xs text-neutral-400">
-                Renginiz: <span className="text-primary font-bold">{player.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
+                Renginiz: <span className="text-primary font-bold">{matchLinkInfo.matchColor === 'white' ? '⬜ BEYAZ' : '⬛ SİYAH'}</span>
               </p>
               {countdown && matchStatus !== 'started' && (
                 <p className={`text-xs font-bold font-mono ${countdown.includes('DOLDU') ? 'text-red-400 animate-pulse' : 'text-yellow-400'}`}>
@@ -213,14 +216,14 @@ export const GlobalMatchBanner = () => {
             </div>
           </div>
           <a 
-            href={player.upcomingMatch}
+            href={matchLinkInfo.upcomingMatch}
             target="_blank"
             rel="noopener noreferrer"
             onClick={async () => {
               try {
-                const matchRef = doc(db, 'matches', player.matchId!);
+                const matchRef = doc(db, 'matches', matchLinkInfo.matchId!);
                 await updateDoc(matchRef, {
-                  [`${player.matchColor}Joined`]: true
+                  [`${matchLinkInfo.matchColor}Joined`]: true
                 });
               } catch (e) {
                 console.error("Failed to mark as joined:", e);
