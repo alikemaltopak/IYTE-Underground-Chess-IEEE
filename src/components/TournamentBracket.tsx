@@ -1214,7 +1214,10 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
   const activePlayerCount = tournament.playerIds.filter((id: string) => {
     const p = players.find(player => player.id === id || player.uid === id);
-    return p?.status !== 'eliminated';
+    if (p?.status === 'eliminated') return false;
+    const s = standings.find(st => st.playerId === id);
+    if (!s) return true;
+    return (s.losses + Math.floor(s.draws / 2)) < 2;
   }).length;
 
   return (

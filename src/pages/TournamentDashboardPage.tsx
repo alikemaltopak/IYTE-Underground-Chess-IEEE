@@ -110,7 +110,16 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
   };
 
   const playerCount = players.length;
-  const activePlayerCount = players.filter(p => p.status !== 'eliminated').length;
+  const standings = tournament && tournament.rounds 
+    ? calculateStandings(tournament.rounds, tournament.playerIds || []) 
+    : [];
+  const activePlayerCount = tournament && tournament.rounds && tournament.status !== 'setup'
+    ? standings.filter(s => {
+        const pDoc = players.find(p => p.uid === s.playerId);
+        if (pDoc?.status === 'eliminated') return false;
+        return (s.losses + Math.floor(s.draws / 2)) < 2;
+      }).length
+    : players.length;
 
   // Determine active tournament format based on player count
   const getActiveFormat = (count: number): number => {
