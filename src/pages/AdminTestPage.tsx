@@ -283,24 +283,24 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     }
   };
 
-  // === KINGSHADOW & IMPREGNABLE_WANDERER 3. TUR DÜZELTME PROTOKOLÜ ===
+  // === KINGSHADOW & SKIP 06 3. TUR DÜZELTME PROTOKOLÜ ===
   const handleFixKingShadow = async () => {
-    if (!window.confirm("Kingshadow'ı eleyip, r3_lm12 maçını impregnable_wanderer vs muzceviz olarak güncellemek ve r3_lbye (BYE) maçını kaldırmak istediğinize emin misiniz?")) {
+    if (!window.confirm("Kingshadow'ı eleyip, r3_lm12 maçını skip 06 vs muzceviz olarak güncellemek ve skip 06'nın bay geçtiği r3_wbye maçını kaldırmak istediğinize emin misiniz?")) {
       return;
     }
     try {
       let kingshadowUid = "";
-      let impregnableWandererUid = "";
+      let skip06Uid = "";
       let muzcevizUid = "";
 
       players.forEach(p => {
         if (p.codename === "kingshadow") kingshadowUid = p.id;
-        if (p.codename === "impregnable_wanderer") impregnableWandererUid = p.id;
+        if (p.codename === "skip 06" || p.codename === "skip06") skip06Uid = p.id;
         if (p.codename === "muzceviz") muzcevizUid = p.id;
       });
 
-      if (!kingshadowUid || !impregnableWandererUid || !muzcevizUid) {
-        alert(`Gerekli oyuncular bulunamadı!\nkingshadow: ${kingshadowUid || 'BULUNAMADI'}\nimpregnable_wanderer: ${impregnableWandererUid || 'BULUNAMADI'}\nmuzceviz: ${muzcevizUid || 'BULUNAMADI'}`);
+      if (!kingshadowUid || !skip06Uid || !muzcevizUid) {
+        alert(`Gerekli oyuncular bulunamadı!\nkingshadow: ${kingshadowUid || 'BULUNAMADI'}\nskip 06: ${skip06Uid || 'BULUNAMADI'}\nmuzceviz: ${muzcevizUid || 'BULUNAMADI'}`);
         return;
       }
 
@@ -318,15 +318,15 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         return;
       }
 
-      // a. Match r3_lm12'yi güncelle: kingshadow yerine impregnable_wanderer yaz
+      // a. Match r3_lm12'yi güncelle: kingshadow yerine skip 06 yaz
       let matchFound = false;
       round3.matches = round3.matches.map((m: any) => {
         if (m.id === "r3_lm12") {
           if (m.player1Id === kingshadowUid) {
-            m.player1Id = impregnableWandererUid;
+            m.player1Id = skip06Uid;
             matchFound = true;
           } else if (m.player2Id === kingshadowUid) {
-            m.player2Id = impregnableWandererUid;
+            m.player2Id = skip06Uid;
             matchFound = true;
           }
         }
@@ -338,21 +338,21 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         return;
       }
 
-      // b. r3_lbye (impregnable_wanderer vs BYE) maçını kaldır
-      round3.matches = round3.matches.filter((m: any) => m.id !== "r3_lbye");
+      // b. r3_wbye (skip 06 vs BYE) maçını kaldır
+      round3.matches = round3.matches.filter((m: any) => m.id !== "r3_wbye");
 
       // c. Firestore'da turnuvayı güncelle
       await updateDoc(tourneyRef, { rounds: newRounds });
 
       // d. Oyuncu durumlarını güncelle
       await updateDoc(doc(db, "players", kingshadowUid), { status: "eliminated" });
-      await updateDoc(doc(db, "players", impregnableWandererUid), { status: "active" });
+      await updateDoc(doc(db, "players", skip06Uid), { status: "active" });
 
       // e. Oyuncu durumlarını eşitle (syncPlayerStatuses)
       const { syncPlayerStatuses } = await import('../components/TournamentBracket');
       await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
 
-      alert("Düzeltme protokolü başarıyla uygulandı!\nkingshadow elendi.\nimpregnable_wanderer aktif edildi ve r3_lm12 maçına atandı.");
+      alert("Düzeltme protokolü başarıyla uygulandı!\nkingshadow elendi.\nskip 06 aktif edildi ve r3_lm12 maçında muzceviz ile eşleştirildi.");
     } catch (err: any) {
       console.error(err);
       alert("Hata oluştu: " + err.message);
