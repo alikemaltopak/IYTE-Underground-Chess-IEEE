@@ -169,8 +169,11 @@ export const syncPlayerStatuses = async (format: string, rounds: TournamentRound
     const standings = calculateStandings(rounds, playerIds);
     const promises = standings.map(async (standing) => {
       let shouldEliminate = false;
-      if (format === 'double_elimination' && standing.losses >= 2) {
-        shouldEliminate = true;
+      if (format === 'double_elimination') {
+        const effectiveLosses = standing.losses + Math.floor(standing.draws / 2);
+        if (effectiveLosses >= 2) {
+          shouldEliminate = true;
+        }
       } else if (format === 'single_elimination' && standing.losses >= 1) {
         shouldEliminate = true;
       } else if (format === 'hybrid') {
@@ -273,7 +276,7 @@ function checkTournamentFinished(format: string, rounds: TournamentRound[], play
   }
   
   if (format === 'double_elimination') {
-    const active = standings.filter(s => s.losses < 2);
+    const active = standings.filter(s => (s.losses + Math.floor(s.draws / 2)) < 2);
     return active.length <= 1;
   }
   
@@ -461,8 +464,8 @@ function generateNextDoubleEliminationRound(rounds: TournamentRound[], playerIds
   const nextRoundNumber = rounds.length + 1;
   const newMatches: RoundRobinMatch[] = [];
   
-  const winners = standings.filter(s => s.losses === 0).map(s => s.playerId);
-  const losers = standings.filter(s => s.losses === 1).map(s => s.playerId);
+  const winners = standings.filter(s => (s.losses + Math.floor(s.draws / 2)) === 0).map(s => s.playerId);
+  const losers = standings.filter(s => (s.losses + Math.floor(s.draws / 2)) === 1).map(s => s.playerId);
   
   if (winners.length === 1 && losers.length === 1) {
     newMatches.push({
@@ -1268,7 +1271,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
               {standings.map((s, i) => {
                 const playerDoc = players.find(p => p.id === s.playerId);
                 const isEliminated = playerDoc?.status === 'eliminated' || 
-                  (tournament.format === 'double_elimination' && s.losses >= 2) ||
+                  (tournament.format === 'double_elimination' && (s.losses + Math.floor(s.draws / 2)) >= 2) ||
                   (tournament.format === 'single_elimination' && s.losses >= 1);
 
                 return (
