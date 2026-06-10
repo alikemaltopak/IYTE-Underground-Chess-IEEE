@@ -170,6 +170,8 @@ export const GlobalMatchBanner = () => {
             rounds: newRounds,
             ...(allCompleted ? { status: 'completed' } : {})
           });
+          const { syncPlayerStatuses } = await import('./TournamentBracket');
+          await syncPlayerStatuses(tData.format, newRounds, tData.playerIds);
         }
       }
       

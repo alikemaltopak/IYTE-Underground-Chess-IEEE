@@ -164,6 +164,42 @@ export function calculateStandings(rounds: TournamentRound[], playerIds: string[
   return Object.values(standings).sort((a, b) => b.points - a.points || b.wins - a.wins);
 }
 
+export const syncPlayerStatuses = async (format: string, rounds: TournamentRound[], playerIds: string[]) => {
+  try {
+    const standings = calculateStandings(rounds, playerIds);
+    const promises = standings.map(async (standing) => {
+      let shouldEliminate = false;
+      if (format === 'double_elimination' && standing.losses >= 2) {
+        shouldEliminate = true;
+      } else if (format === 'single_elimination' && standing.losses >= 1) {
+        shouldEliminate = true;
+      } else if (format === 'hybrid') {
+        const lostInElimination = rounds.slice(4).some(r => 
+          r.matches.some(m => m.status === 'completed' && m.winnerId && m.winnerId !== 'draw' && 
+            (m.player1Id === standing.playerId || m.player2Id === standing.playerId) && m.winnerId !== standing.playerId
+          )
+        );
+        if (lostInElimination) {
+          shouldEliminate = true;
+        }
+      }
+
+      const playerRef = doc(db, 'players', standing.playerId);
+      const playerDoc = await getDoc(playerRef);
+      if (playerDoc.exists()) {
+        const currentStatus = playerDoc.data().status;
+        const targetStatus = shouldEliminate ? 'eliminated' : 'active';
+        if (currentStatus !== targetStatus) {
+          await updateDoc(playerRef, { status: targetStatus });
+        }
+      }
+    });
+    await Promise.all(promises);
+  } catch (err) {
+    console.error("Error syncing player statuses:", err);
+  }
+};
+
 // ============ GENERALIZED PAIRING SYSTEM ============
 
 function generateInitialRound(format: string, playerIds: string[]): TournamentRound[] {
@@ -983,6 +1019,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
           rounds: newRounds,
           ...(isTournamentFinished ? { status: 'completed' } : {})
         });
+        await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
       }
     };
 
@@ -1007,6 +1044,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
       rounds: newRounds,
       ...(isTournamentFinished ? { status: 'completed' } : {})
     });
+    await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
   };
 
   // Maç sonucunu sıfırla
@@ -1017,6 +1055,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
     match.winnerId = null;
     match.status = 'pending';
     await updateDoc(doc(db, 'tournament', 'current'), { rounds: newRounds, status: 'active' });
+    await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
   };
 
   // Tur tarih/saatini güncelle
@@ -1221,19 +1260,39 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
               </tr>
             </thead>
             <tbody>
-              {standings.map((s, i) => (
-                <tr key={s.playerId} className={`border-b border-white/5 ${i === 0 && tournament.status === 'completed' ? 'bg-yellow-500/5' : ''}`}>
-                  <td className="py-2.5 px-3 font-mono text-neutral-600">
-                    {i === 0 && tournament.status === 'completed' ? <Crown className="w-3 h-3 text-yellow-400 inline" /> : i + 1}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold text-white">{getPlayerName(s.playerId)}</td>
-                  <td className="py-2.5 px-1 text-center text-neutral-400">{s.played}</td>
-                  <td className="py-2.5 px-1 text-center text-green-400 font-bold">{s.wins}</td>
-                  <td className="py-2.5 px-1 text-center text-yellow-400">{s.draws}</td>
-                  <td className="py-2.5 px-1 text-center text-red-400">{s.losses}</td>
-                  <td className="py-2.5 px-3 text-center text-primary font-black text-sm">{s.points}</td>
-                </tr>
-              ))}
+              {standings.map((s, i) => {
+                const playerDoc = players.find(p => p.id === s.playerId);
+                const isEliminated = playerDoc?.status === 'eliminated' || 
+                  (tournament.format === 'double_elimination' && s.losses >= 2) ||
+                  (tournament.format === 'single_elimination' && s.losses >= 1);
+
+                return (
+                  <tr key={s.playerId} className={`border-b border-white/5 ${i === 0 && tournament.status === 'completed' ? 'bg-yellow-500/5' : ''} ${isEliminated ? 'bg-red-500/[0.02]' : ''}`}>
+                    <td className="py-2.5 px-3 font-mono text-neutral-600">
+                      {i === 0 && tournament.status === 'completed' ? <Crown className="w-3 h-3 text-yellow-400 inline" /> : i + 1}
+                    </td>
+                    <td className="py-2.5 px-3 font-bold text-white">
+                      {isEliminated ? (
+                        <span className="text-neutral-500 line-through decoration-red-500/70 decoration-2">
+                          {getPlayerName(s.playerId)}
+                        </span>
+                      ) : (
+                        <span>{getPlayerName(s.playerId)}</span>
+                      )}
+                      {isEliminated && (
+                        <span className="text-[8px] bg-red-500/10 text-red-400 border border-red-500/20 px-1.5 py-0.5 ml-2 font-bold tracking-widest rounded inline-block align-middle">
+                          ELENDİ
+                        </span>
+                      )}
+                    </td>
+                    <td className={`py-2.5 px-1 text-center ${isEliminated ? 'text-neutral-600' : 'text-neutral-400'}`}>{s.played}</td>
+                    <td className={`py-2.5 px-1 text-center ${isEliminated ? 'text-green-900' : 'text-green-400 font-bold'}`}>{s.wins}</td>
+                    <td className={`py-2.5 px-1 text-center ${isEliminated ? 'text-neutral-700' : 'text-yellow-400'}`}>{s.draws}</td>
+                    <td className={`py-2.5 px-1 text-center ${isEliminated ? 'text-red-900' : 'text-red-400'}`}>{s.losses}</td>
+                    <td className={`py-2.5 px-3 text-center ${isEliminated ? 'text-primary/40' : 'text-primary font-black text-sm'}`}>{s.points}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

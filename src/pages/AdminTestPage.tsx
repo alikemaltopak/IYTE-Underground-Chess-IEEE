@@ -127,6 +127,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
           rounds: newRounds,
           ...(allCompleted ? { status: 'completed' } : {})
         });
+        const { syncPlayerStatuses } = await import('../components/TournamentBracket');
+        await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
       }
     } catch (e) {
       console.error("Tournament match sync error:", e);
@@ -281,6 +283,82 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     }
   };
 
+  // === KINGSHADOW & IMPREGNABLE_WANDERER 3. TUR DÜZELTME PROTOKOLÜ ===
+  const handleFixKingShadow = async () => {
+    if (!window.confirm("Kingshadow'ı eleyip, r3_lm12 maçını impregnable_wanderer vs muzceviz olarak güncellemek ve r3_lbye (BYE) maçını kaldırmak istediğinize emin misiniz?")) {
+      return;
+    }
+    try {
+      let kingshadowUid = "";
+      let impregnableWandererUid = "";
+      let muzcevizUid = "";
+
+      players.forEach(p => {
+        if (p.codename === "kingshadow") kingshadowUid = p.id;
+        if (p.codename === "impregnable_wanderer") impregnableWandererUid = p.id;
+        if (p.codename === "muzceviz") muzcevizUid = p.id;
+      });
+
+      if (!kingshadowUid || !impregnableWandererUid || !muzcevizUid) {
+        alert(`Gerekli oyuncular bulunamadı!\nkingshadow: ${kingshadowUid || 'BULUNAMADI'}\nimpregnable_wanderer: ${impregnableWandererUid || 'BULUNAMADI'}\nmuzceviz: ${muzcevizUid || 'BULUNAMADI'}`);
+        return;
+      }
+
+      if (!tournament) {
+        alert("Turnuva bilgisi yüklenemedi!");
+        return;
+      }
+
+      const tourneyRef = doc(db, "tournament", "current");
+      const newRounds = JSON.parse(JSON.stringify(tournament.rounds));
+      const round3 = newRounds[2]; // Round 3 index is 2
+
+      if (!round3 || round3.roundNumber !== 3) {
+        alert("3. Tur verisi bulunamadı!");
+        return;
+      }
+
+      // a. Match r3_lm12'yi güncelle: kingshadow yerine impregnable_wanderer yaz
+      let matchFound = false;
+      round3.matches = round3.matches.map((m: any) => {
+        if (m.id === "r3_lm12") {
+          if (m.player1Id === kingshadowUid) {
+            m.player1Id = impregnableWandererUid;
+            matchFound = true;
+          } else if (m.player2Id === kingshadowUid) {
+            m.player2Id = impregnableWandererUid;
+            matchFound = true;
+          }
+        }
+        return m;
+      });
+
+      if (!matchFound) {
+        alert("r3_lm12 maçı kingshadow ile bulunamadı veya zaten düzeltildi!");
+        return;
+      }
+
+      // b. r3_lbye (impregnable_wanderer vs BYE) maçını kaldır
+      round3.matches = round3.matches.filter((m: any) => m.id !== "r3_lbye");
+
+      // c. Firestore'da turnuvayı güncelle
+      await updateDoc(tourneyRef, { rounds: newRounds });
+
+      // d. Oyuncu durumlarını güncelle
+      await updateDoc(doc(db, "players", kingshadowUid), { status: "eliminated" });
+      await updateDoc(doc(db, "players", impregnableWandererUid), { status: "active" });
+
+      // e. Oyuncu durumlarını eşitle (syncPlayerStatuses)
+      const { syncPlayerStatuses } = await import('../components/TournamentBracket');
+      await syncPlayerStatuses(tournament.format, newRounds, tournament.playerIds);
+
+      alert("Düzeltme protokolü başarıyla uygulandı!\nkingshadow elendi.\nimpregnable_wanderer aktif edildi ve r3_lm12 maçına atandı.");
+    } catch (err: any) {
+      console.error(err);
+      alert("Hata oluştu: " + err.message);
+    }
+  };
+
   // Yardımcı: ID'den oyuncu adı bul
   const getPlayerName = (uid: string) => {
     const p = players.find(p => p.id === uid);
@@ -388,17 +466,28 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         {/* MAÇ YÖNETİMİ TAB'I */}
         {adminTab === 'matches' && (<>
 
-        {/* TOPLU TEMİZLE BUTONU */}
-        {matches.length > 0 && (
-          <div className="mb-6 flex justify-end">
+        {/* AKSİYON BUTONLARI KONTEYNERI */}
+        <div className="mb-6 flex flex-wrap gap-3 justify-between items-center">
+          {/* PROTOKOL DÜZELTME BUTONU */}
+          {tournament && tournament.rounds?.length >= 3 && (
+            <button
+              onClick={handleFixKingShadow}
+              className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 py-2 px-5 text-xs font-bold tracking-widest flex items-center gap-2 rounded-lg transition-all"
+            >
+              <ShieldAlert className="w-4 h-4" /> 3. TUR EŞLEŞMELERİNİ DÜZELT (Prot.)
+            </button>
+          )}
+
+          {/* TOPLU TEMİZLE BUTONU */}
+          {matches.length > 0 ? (
             <button
               onClick={handleClearAllMatches}
-              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-5 text-xs font-bold tracking-widest flex items-center gap-2"
+              className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 py-2 px-5 text-xs font-bold tracking-widest flex items-center gap-2 rounded-lg transition-all"
             >
               <Trash2 className="w-3 h-3" /> TÜM MAÇLARI TEMİZLE ({matches.length})
             </button>
-          </div>
-        )}
+          ) : <div />}
+        </div>
 
         {/* AKTİF MAÇLAR */}
         {activeMatches.length > 0 && (
