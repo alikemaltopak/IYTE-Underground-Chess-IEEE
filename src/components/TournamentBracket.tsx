@@ -31,6 +31,7 @@ export interface TournamentData {
   rounds: TournamentRound[];
   playerIds: string[];
   createdAt: any;
+  mergeRound?: number;
 }
 
 export interface Standing {
@@ -299,8 +300,10 @@ function generateNextSwissRound(rounds: TournamentRound[], playerIds: string[]):
   rounds.forEach(round => {
     round.matches.forEach(match => {
       if (match.player1Id !== 'BYE' && match.player2Id !== 'BYE') {
-        playedOpponents[match.player1Id].add(match.player2Id);
-        playedOpponents[match.player2Id].add(match.player1Id);
+        if (playedOpponents[match.player1Id] && playedOpponents[match.player2Id]) {
+          playedOpponents[match.player1Id].add(match.player2Id);
+          playedOpponents[match.player2Id].add(match.player1Id);
+        }
       }
     });
   });
@@ -455,8 +458,10 @@ function generateNextDoubleEliminationRound(rounds: TournamentRound[], playerIds
   rounds.forEach(round => {
     round.matches.forEach(match => {
       if (match.player1Id !== 'BYE' && match.player2Id !== 'BYE') {
-        playedOpponents[match.player1Id].add(match.player2Id);
-        playedOpponents[match.player2Id].add(match.player1Id);
+        if (playedOpponents[match.player1Id] && playedOpponents[match.player2Id]) {
+          playedOpponents[match.player1Id].add(match.player2Id);
+          playedOpponents[match.player2Id].add(match.player1Id);
+        }
       }
     });
   });
@@ -682,18 +687,188 @@ function generateNextHybridRound(rounds: TournamentRound[], playerIds: string[])
   return newMatches;
 }
 
-function generateNextRoundMatches(format: string, rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+function generateRandomPairing(rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  const playedOpponents: Record<string, Set<string>> = {};
+  playerIds.forEach(id => {
+    playedOpponents[id] = new Set<string>();
+  });
+  
+  rounds.forEach(round => {
+    round.matches.forEach(match => {
+      if (match.player1Id !== 'BYE' && match.player2Id !== 'BYE') {
+        if (playedOpponents[match.player1Id] && playedOpponents[match.player2Id]) {
+          playedOpponents[match.player1Id].add(match.player2Id);
+          playedOpponents[match.player2Id].add(match.player1Id);
+        }
+      }
+    });
+  });
+
+  const nextRoundNumber = rounds.length + 1;
+  
+  // Shuffle player list
+  const shuffled = [...playerIds];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const temp = shuffled[i];
+    shuffled[i] = shuffled[j];
+    shuffled[j] = temp;
+  }
+
+  const newMatches: RoundRobinMatch[] = [];
+  const paired = new Set<string>();
+
+  const isOdd = shuffled.length % 2 !== 0;
+  if (isOdd) {
+    const playersWithBye = new Set<string>();
+    rounds.forEach(round => {
+      const allPlayersInMatches = new Set(round.matches.flatMap(m => [m.player1Id, m.player2Id]));
+      playerIds.forEach(id => {
+        if (!allPlayersInMatches.has(id)) {
+          playersWithBye.add(id);
+        }
+      });
+    });
+
+    let byePlayerId = '';
+    for (let i = shuffled.length - 1; i >= 0; i--) {
+      const pid = shuffled[i];
+      if (!playersWithBye.has(pid)) {
+        byePlayerId = pid;
+        break;
+      }
+    }
+    if (!byePlayerId) {
+      byePlayerId = shuffled[shuffled.length - 1];
+    }
+
+    paired.add(byePlayerId);
+    newMatches.push({
+      id: `r${nextRoundNumber}_bye`,
+      round: nextRoundNumber,
+      matchIndex: 99,
+      player1Id: byePlayerId,
+      player2Id: 'BYE',
+      winnerId: byePlayerId,
+      status: 'completed'
+    });
+  }
+
+  let matchIdx = 0;
+  for (let i = 0; i < shuffled.length; i++) {
+    const p1 = shuffled[i];
+    if (paired.has(p1)) continue;
+
+    let p2 = '';
+    for (let j = i + 1; j < shuffled.length; j++) {
+      const candidate = shuffled[j];
+      if (!paired.has(candidate) && !playedOpponents[p1].has(candidate)) {
+        p2 = candidate;
+        break;
+      }
+    }
+
+    if (!p2) {
+      for (let j = i + 1; j < shuffled.length; j++) {
+        const candidate = shuffled[j];
+        if (!paired.has(candidate)) {
+          p2 = candidate;
+          break;
+        }
+      }
+    }
+
+    if (p2) {
+      paired.add(p1);
+      paired.add(p2);
+      newMatches.push({
+        id: `r${nextRoundNumber}_m${matchIdx}`,
+        round: nextRoundNumber,
+        matchIndex: matchIdx,
+        player1Id: p1,
+        player2Id: p2,
+        winnerId: null,
+        status: 'pending'
+      });
+      matchIdx++;
+    } else {
+      paired.add(p1);
+      newMatches.push({
+        id: `r${nextRoundNumber}_bye`,
+        round: nextRoundNumber,
+        matchIndex: 99,
+        player1Id: p1,
+        player2Id: 'BYE',
+        winnerId: p1,
+        status: 'completed'
+      });
+    }
+  }
+
+  return newMatches;
+}
+
+function generateNextRoundMatches(tournament: TournamentData, rounds: TournamentRound[], playerIds: string[]): RoundRobinMatch[] {
+  const { format, mergeRound } = tournament;
   if (format === 'swiss') return generateNextSwissRound(rounds, playerIds);
   if (format === 'single_elimination') return generateNextSingleEliminationRound(rounds, playerIds);
-  if (format === 'double_elimination') return generateNextDoubleEliminationRound(rounds, playerIds);
+  if (format === 'double_elimination') {
+    // Starting from the merge round, pool all players together and match them randomly
+    if (mergeRound && rounds.length >= (mergeRound - 1)) {
+      const nextRoundNumber = rounds.length + 1;
+      
+      // Find players who would have gotten a BYE under double elimination
+      const proposedDoubleElimMatches = generateNextDoubleEliminationRound(rounds, playerIds);
+      const byePlayerIds = proposedDoubleElimMatches
+        .filter(m => m.player2Id === 'BYE')
+        .map(m => m.player1Id);
+        
+      let forcedMatches: RoundRobinMatch[] = [];
+      let remainingPlayers = [...playerIds];
+      
+      if (byePlayerIds.length >= 2) {
+        // We have 2 or more players who would have gotten a BYE. Pair them up!
+        for (let i = 0; i < byePlayerIds.length - 1; i += 2) {
+          const p1 = byePlayerIds[i];
+          const p2 = byePlayerIds[i + 1];
+          forcedMatches.push({
+            id: `r${nextRoundNumber}_forced_${i}`,
+            round: nextRoundNumber,
+            matchIndex: i,
+            player1Id: p1,
+            player2Id: p2,
+            winnerId: null,
+            status: 'pending'
+          });
+          remainingPlayers = remainingPlayers.filter(id => id !== p1 && id !== p2);
+        }
+      }
+      
+      // Match the remaining players using random pairing
+      const remainingMatches = generateRandomPairing(rounds, remainingPlayers);
+      
+      // Re-index matches
+      const matches = [...forcedMatches];
+      remainingMatches.forEach((m, idx) => {
+        m.id = `r${nextRoundNumber}_m${matches.length}`;
+        m.matchIndex = matches.length;
+        matches.push(m);
+      });
+      
+      return matches;
+    }
+    return generateNextDoubleEliminationRound(rounds, playerIds);
+  }
   if (format === 'hybrid') return generateNextHybridRound(rounds, playerIds);
   return [];
 }
+
 
 // ============ MAIN COMPONENT ============
 
 export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, getPlayerName, isAdmin = false }) => {
   const [tournament, setTournament] = useState<TournamentData | null>(null);
+  const [shouldMerge, setShouldMerge] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startingRound, setStartingRound] = useState<number | null>(null);
   const [polling, setPolling] = useState(false);
@@ -759,7 +934,11 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'tournament', 'current'), (snap) => {
       if (snap.exists() && !(snap.data() as any).deleted) {
-        setTournament(snap.data() as TournamentData);
+        const data = snap.data() as TournamentData;
+        setTournament(data);
+        if (data.format === 'double_elimination' && data.rounds && data.rounds.length === 4 && !data.mergeRound) {
+          setShouldMerge(true);
+        }
       } else {
         setTournament(null);
       }
@@ -1073,7 +1252,14 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
   const generateNextRound = async () => {
     if (!tournament) return;
     try {
-      const newMatches = generateNextRoundMatches(tournament.format, tournament.rounds, tournament.playerIds);
+      // Filter playerIds to only include active/registered players from the database
+      const activeIds = players.filter(p => p.status === 'active' || p.status === 'registered').map(p => p.id);
+      
+      const tournamentForMatching = shouldMerge
+        ? { ...tournament, mergeRound: tournament.rounds.length + 1 }
+        : tournament;
+        
+      const newMatches = generateNextRoundMatches(tournamentForMatching, tournament.rounds, activeIds);
       const nextRoundNumber = tournament.rounds.length + 1;
       
       const lastRoundDate = new Date(tournament.rounds[tournament.rounds.length - 1].date);
@@ -1087,10 +1273,17 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
         matches: newMatches
       };
 
-      await updateDoc(doc(db, 'tournament', 'current'), {
+      const updateData: any = {
         rounds: [...tournament.rounds, newRound],
         status: 'active'
-      });
+      };
+
+      if (shouldMerge) {
+        updateData.mergeRound = nextRoundNumber;
+      }
+
+      await updateDoc(doc(db, 'tournament', 'current'), updateData);
+      setShouldMerge(false);
     } catch (e: any) {
       alert("Sonraki tur oluşturulurken hata: " + e.message);
     }
@@ -1506,22 +1699,35 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
          tournament.status === 'active' && 
          completedMatches === totalMatches && 
          !checkTournamentFinished(tournament.format, tournament.rounds, tournament.playerIds) && (
-          <div className="glass-panel border border-primary/20 p-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-primary/5 mt-4">
-            <div>
-              <h4 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
-                <Radio className="w-4 h-4 animate-pulse" /> SONRAKİ TUR EŞLEŞMELERİ HAZIR
-              </h4>
-              <p className="text-[10px] text-neutral-400 mt-1 uppercase">
-                {tournament.rounds.length}. tur tamamlandı. {tournament.rounds.length + 1}. tur için yeni eşleşmeleri başlatabilirsiniz.
-              </p>
-            </div>
-            <button
-              onClick={generateNextRound}
-              className="w-full md:w-auto bg-primary text-black font-display font-bold uppercase tracking-widest text-xs px-6 py-3 hover:shadow-[0_0_15px_rgba(34,197,94,0.4)] transition-all transform active:scale-95 flex items-center justify-center gap-2 shrink-0"
-            >
-              <Shuffle className="w-4 h-4" /> {tournament.rounds.length + 1}. TURU EŞLEŞTİR VE BAŞLAT
-            </button>
-          </div>
+           <div className="glass-panel border border-primary/20 p-6 flex flex-col md:flex-row items-center justify-between gap-4 bg-primary/5 mt-4">
+             <div>
+               <h4 className="text-sm font-bold text-primary uppercase tracking-widest flex items-center gap-2">
+                 <Radio className="w-4 h-4 animate-pulse" /> SONRAKİ TUR EŞLEŞMELERİ HAZIR
+               </h4>
+               <p className="text-[10px] text-neutral-400 mt-1 uppercase">
+                 {tournament.rounds.length}. tur tamamlandı. {tournament.rounds.length + 1}. tur için yeni eşleşmeleri başlatabilirsiniz.
+               </p>
+             </div>
+             <div className="flex flex-col gap-2 w-full md:w-auto">
+               <button
+                 onClick={generateNextRound}
+                 className="w-full bg-primary text-black font-display font-bold uppercase tracking-widest text-xs px-6 py-3 hover:shadow-[0_0_15px_rgba(34,197,94,0.4)] transition-all transform active:scale-95 flex items-center justify-center gap-2 shrink-0"
+               >
+                 <Shuffle className="w-4 h-4" /> {tournament.rounds.length + 1}. TURU EŞLEŞTİR VE BAŞLAT
+               </button>
+               {tournament.format === 'double_elimination' && !tournament.mergeRound && (
+                 <label className="flex items-center gap-2 text-[10px] text-neutral-400 cursor-pointer select-none mt-1 hover:text-white transition-colors">
+                   <input
+                     type="checkbox"
+                     checked={shouldMerge}
+                     onChange={(e) => setShouldMerge(e.target.checked)}
+                     className="accent-primary"
+                   />
+                   Grup Ayrımını Kaldır (Tüm oyuncuları rasgele eşleştir)
+                 </label>
+               )}
+             </div>
+           </div>
         )}
 
         {/* MÜSABAKA DETAY GÜNLÜĞÜ MODALI */}
