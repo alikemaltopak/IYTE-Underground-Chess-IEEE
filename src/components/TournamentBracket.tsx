@@ -959,6 +959,32 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
     };
   }, []);
 
+  useEffect(() => {
+    if (tournament && isAdmin) {
+      const rounds = tournament.rounds;
+      if (rounds.length >= 5) {
+        const r5 = rounds[4];
+        const matches = r5.matches;
+        const matchIndex = matches.findIndex(m => m.player1Id === 'N499KUYAcSZafSqB0iKEfPwx80h2' || m.player2Id === 'N499KUYAcSZafSqB0iKEfPwx80h2');
+        if (matchIndex !== -1) {
+          const newRounds = JSON.parse(JSON.stringify(rounds)) as TournamentRound[];
+          const targetMatch = newRounds[4].matches[matchIndex];
+          if (targetMatch.player1Id === 'N499KUYAcSZafSqB0iKEfPwx80h2') {
+            targetMatch.player1Id = 'Jh68u4JEsuPAaPZ2WxaR2DsUpZt2';
+          } else {
+            targetMatch.player2Id = 'Jh68u4JEsuPAaPZ2WxaR2DsUpZt2';
+          }
+          console.log("Auto-correcting Round 5 match: replacing yeraltıcanavarı with xenon");
+          updateDoc(doc(db, 'tournament', 'current'), { rounds: newRounds }).then(() => {
+            console.log("Round 5 match auto-corrected in Firestore successfully!");
+          }).catch(err => {
+            console.error("Error auto-correcting Round 5 match:", err);
+          });
+        }
+      }
+    }
+  }, [tournament, isAdmin]);
+
   const registeredPlayers = players.filter(p => p.status === 'registered' || p.status === 'active');
   const formatInfo = detectFormat(registeredPlayers.length);
 
