@@ -11,9 +11,18 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method Not Allowed' });
 
   try {
-    const { codename } = req.body;
+    let { codename } = req.body;
     if (!codename) {
       return res.status(400).json({ valid: false, reason: "Kod adı belirtilmedi." });
+    }
+
+    // Yerel ön kontroller (server.js ile aynı): yapay zekaya gitmeden reddet
+    codename = codename.replace(/[^\w\s]/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (codename.length < 3) {
+      return res.status(200).json({ valid: false, reason: "Takma ad en az 3 karakter olmalıdır." });
+    }
+    if (/^\d+$/.test(codename)) {
+      return res.status(200).json({ valid: false, reason: "Takma ad sadece rakamlardan oluşamaz." });
     }
 
     if (!process.env.GEMINI_API_KEY) {
