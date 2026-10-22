@@ -8,11 +8,12 @@
 //   GOOGLE_APPLICATION_CREDENTIALS=servis-hesabi.json node scripts/migrate-private-player-data.mjs --apply  # uygula
 //
 // Yeni firestore.rules kurallarını bu betik --apply ile çalıştıktan SONRA yayınlayın.
-import admin from 'firebase-admin';
+import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 
 const apply = process.argv.includes('--apply');
-admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId: process.env.FIREBASE_PROJECT_ID });
-const db = admin.firestore();
+initializeApp({ credential: applicationDefault(), projectId: process.env.FIREBASE_PROJECT_ID });
+const db = getFirestore();
 
 const players = await db.collection('players').get();
 let moved = 0, skipped = 0;
@@ -36,8 +37,8 @@ for (const snap of players.docs) {
     }, { merge: true });
     if (studentId) batch.set(db.collection('student_ids').doc(String(studentId)), { uid: snap.id });
     batch.update(snap.ref, {
-      email: admin.firestore.FieldValue.delete(),
-      studentId: admin.firestore.FieldValue.delete(),
+      email: FieldValue.delete(),
+      studentId: FieldValue.delete(),
     });
     await batch.commit();
   }
