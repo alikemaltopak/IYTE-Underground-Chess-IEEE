@@ -5,10 +5,14 @@ import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
 import { ShieldAlert, Swords, Loader2, Link as LinkIcon, Trash2, Trophy, XCircle, Minus, Timer, Gavel, LayoutGrid } from 'lucide-react';
 import { TournamentBracket } from '../components/TournamentBracket';
+import { isAdminUser } from '../utils/admin';
+import { authFetch } from '../utils/api';
+import { subscribeToPlayersPrivate, PlayerPrivateData } from '../services/playerService';
 
 export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: any) => void }) => {
   const { user } = useAuth();
   const [players, setPlayers] = useState<any[]>([]);
+  const [privateByUid, setPrivateByUid] = useState<Record<string, PlayerPrivateData>>({});
   const [matches, setMatches] = useState<any[]>([]);
   const [tournament, setTournament] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -23,10 +27,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
   }, []);
 
   // Korumalı rota
-  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
-  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
-
-  if (!user?.email || !adminEmails.includes(user.email)) {
+  if (!isAdminUser(user)) {
     return (
       <div className="min-h-screen bg-[#050505] text-white flex flex-col items-center justify-center p-6">
         <ShieldAlert className="w-16 h-16 text-red-500 mb-4" />
@@ -50,7 +51,8 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
         setTournament(snapshot.data());
       }
     });
-    return () => { unsubPlayers(); unsubMatches(); unsubTournament(); };
+    const unsubPrivate = subscribeToPlayersPrivate(setPrivateByUid);
+    return () => { unsubPlayers(); unsubMatches(); unsubTournament(); unsubPrivate(); };
   }, []);
 
   // === HIZLI MAÇ OLUŞTUR ===
@@ -59,7 +61,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
     setMatchLoading(targetPlayer.id);
 
     try {
-      const res = await fetch('/api/create-match', { method: 'POST' });
+      const res = await authFetch('/api/create-match', { method: 'POST' });
       const data = await res.json();
 
       if (data.success) {
@@ -602,7 +604,7 @@ export const AdminTestPage = ({ view, setView }: { view: string, setView: (v: an
                 <h3 className="text-xl font-bold font-display uppercase tracking-wider mb-1">
                   {player.codename || "Bilinmeyen Hedef"}
                 </h3>
-                <p className="text-xs text-neutral-500 font-mono mb-2">{player.email}</p>
+                <p className="text-xs text-neutral-500 font-mono mb-2">{privateByUid[player.id]?.email ?? player.email}</p>
                 
                 {/* Skor */}
                 <div className="flex gap-3 mb-4 text-xs">

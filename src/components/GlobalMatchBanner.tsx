@@ -3,6 +3,7 @@ import { doc, onSnapshot, updateDoc, getDoc, increment } from 'firebase/firestor
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { PlayerData } from '../services/playerService';
+import { isAdminUser } from '../utils/admin';
 
 export const GlobalMatchBanner = () => {
   const { user } = useAuth();
@@ -59,7 +60,9 @@ export const GlobalMatchBanner = () => {
         const remaining = deadlineTime - Date.now();
         if (remaining <= 0) {
           setCountdown('SÜRE DOLDU — Hükmen Değerlendiriliyor...');
-          if (!forfeitTriggeredRef.current && user) {
+          // Hükmen sonucu turnuvaya ve rakibin istatistiklerine yazar; Firestore kuralları gereği sadece adminler yapabilir.
+          // Oyuncunun ekranında sadece geri sayım biter, sonuç admin panelindeki otomatik kontrolle işlenir.
+          if (!forfeitTriggeredRef.current && user && isAdminUser(user)) {
             forfeitTriggeredRef.current = true;
             triggerAutoForfeit(matchLinkInfo.matchId!, user.uid);
           }

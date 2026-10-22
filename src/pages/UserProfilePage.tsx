@@ -4,7 +4,7 @@ import { LogOut, CalendarDays, Globe, Clock3, Sword, Target, Zap, Shield, Grid3X
 import { Navbar } from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import { useAuth } from '../context/AuthContext';
-import { PlayerData } from '../services/playerService';
+import { PlayerData, PlayerPrivateData, getPlayerPrivate } from '../services/playerService';
 import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { checkRegistrationClosed, parseDeadline } from '../utils/date';
@@ -51,6 +51,13 @@ const ARCHETYPE_ICONS: Record<string, any> = {
 export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void; view: any; setView: (v: any) => void }) => {
   const { user, logout } = useAuth();
   const [player, setPlayer] = useState<PlayerData | null>(null);
+  const [privateInfo, setPrivateInfo] = useState<PlayerPrivateData | null>(null);
+
+  // E-posta ve öğrenci no herkese açık kartta değil, sadece sahibinin okuyabildiği koleksiyonda
+  useEffect(() => {
+    if (!user) return;
+    getPlayerPrivate(user.uid).then(setPrivateInfo).catch(() => setPrivateInfo(null));
+  }, [user]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [countdown, setCountdown] = useState('');
@@ -301,11 +308,11 @@ export const UserProfilePage = ({ onBack, view, setView }: { onBack: () => void;
                         <div className="grid gap-3 text-sm text-neutral-300">
                           <div className="flex justify-between gap-4">
                             <span className="text-neutral-500">Öğrenci No</span>
-                            <span className="font-semibold text-white">{player.studentId}</span>
+                            <span className="font-semibold text-white">{privateInfo?.studentId ?? player.studentId ?? '—'}</span>
                           </div>
                           <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 border-b border-white/5 pb-2">
                             <span className="text-neutral-500 text-[11px]">E-posta</span>
-                            <span className="font-semibold text-white text-xs break-all text-right">{player.email}</span>
+                            <span className="font-semibold text-white text-xs break-all text-right">{privateInfo?.email ?? player.email ?? user?.email ?? '—'}</span>
                           </div>
                           <div className="flex justify-between gap-4">
                             <span className="text-neutral-500">Durum</span>

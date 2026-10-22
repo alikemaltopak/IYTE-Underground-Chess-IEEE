@@ -1,8 +1,15 @@
 import { 
-  doc, setDoc, getDoc, collection, query, orderBy, onSnapshot, 
-  serverTimestamp, Timestamp, where, getDocs 
+  doc, getDoc, collection, query, orderBy, onSnapshot, 
+  serverTimestamp, Timestamp, where, getDocs, writeBatch 
 } from 'firebase/firestore';
 import { db } from '../firebase';
+
+// Koleksiyonlar:
+//  players/{uid}          → herkese açık oyuncu kartı (kod adı, arketip, durum, skor)
+//  players_private/{uid}  → kişisel bilgiler (e-posta, öğrenci no): sadece sahibi ve adminler okuyabilir
+//  student_ids/{no}       → öğrenci numarası benzersizliği için rezervasyon ({ uid })
+export const PRIVATE_COLLECTION = 'players_private';
+export const STUDENT_IDS_COLLECTION = 'student_ids';
 
 export interface PlayerMatchInfo {
   upcomingMatch?: string;
@@ -10,14 +17,20 @@ export interface PlayerMatchInfo {
   matchColor?: 'white' | 'black';
 }
 
+export interface PlayerPrivateData {
+  email: string;
+  studentId: string;
+}
+
 export interface PlayerData {
   uid: string;
   codename: string;
-  studentId: string;
   archetype: string;
-  email: string;
   joinedAt: Timestamp | null;
   status: 'registered' | 'active' | 'eliminated';
+  // Kişisel bilgiler: sadece sahibi/admin için getPlayer ile birleştirilir (eski kayıtlarda players içinde olabilir)
+  studentId?: string;
+  email?: string;
   // Lichess Hayalet Maç Alanları (Artık player_matches koleksiyonunda tutuluyor)
   upcomingMatch?: string;
   matchId?: string;
@@ -30,6 +43,9 @@ export interface PlayerData {
 
 // Check if a studentId is already used (only for NEW character creation)
 export const isStudentIdTaken = async (studentId: string): Promise<boolean> => {
+  const reservation = await getDoc(doc(db, STUDENT_IDS_COLLECTION, studentId));
+  if (reservation.exists()) return true;
+  // Taşıma betiği çalıştırılmadan önceki eski kayıtlar
   const q = query(collection(db, 'players'), where('studentId', '==', studentId));
   const snapshot = await getDocs(q);
   return snapshot.docs.length > 0;
@@ -77,16 +93,21 @@ export const savePlayer = async (
       return { success: false, error: 'Bu kullanıcı adı zaten başka bir oyuncu tarafından kullanılıyor.' };
     }
 
-    const playerRef = doc(db, 'players', uid);
-    await setDoc(playerRef, {
+    // Herkese açık kart, gizli bilgiler ve öğrenci no rezervasyonu tek seferde yazılır
+    const batch = writeBatch(db);
+    batch.set(doc(db, 'players', uid), {
       uid,
       codename: data.codename.toUpperCase(),
-      studentId: data.studentId,
       archetype: data.archetype,
-      email: data.email,
       joinedAt: serverTimestamp(),
       status: 'registered'
-    }, { merge: true });
+    });
+    batch.set(doc(db, PRIVATE_COLLECTION, uid), {
+      email: data.email,
+      studentId: data.studentId
+    });
+    batch.set(doc(db, STUDENT_IDS_COLLECTION, data.studentId), { uid });
+    await batch.commit();
 
     return { success: true };
   }
@@ -104,27 +125,33 @@ export const savePlayer = async (
     }
   }
 
-  // Update işlemi
-  const playerRef = doc(db, 'players', uid);
-  await setDoc(playerRef, {
+  // Update işlemi (oyuncu sadece kod adı ve arketipini değiştirebilir)
+  const batch = writeBatch(db);
+  batch.update(doc(db, 'players', uid), {
     codename: data.codename.toUpperCase(),
     archetype: data.archetype
-  }, { merge: true });
+  });
+  await batch.commit();
 
   return { success: true };
 };
 
-// Check if a player already exists
-export const getPlayer = async (uid: string): Promise<PlayerData | null> => {
-  const playerRef = doc(db, 'players', uid);
-  const snap = await getDoc(playerRef);
-  if (snap.exists()) {
-    return snap.data() as PlayerData;
-  }
-  return null;
+/** Oyuncunun gizli bilgileri (sadece kendisi ve adminler okuyabilir). */
+export const getPlayerPrivate = async (uid: string): Promise<PlayerPrivateData | null> => {
+  const snap = await getDoc(doc(db, PRIVATE_COLLECTION, uid));
+  return snap.exists() ? (snap.data() as PlayerPrivateData) : null;
 };
 
-// Subscribe to all players in real-time (for the dashboard)
+// Check if a player already exists (kendi profilini okurken gizli bilgiler de eklenir)
+export const getPlayer = async (uid: string): Promise<PlayerData | null> => {
+  const snap = await getDoc(doc(db, 'players', uid));
+  if (!snap.exists()) return null;
+  const publicData = snap.data() as PlayerData;
+  const privateData = await getPlayerPrivate(uid).catch(() => null);
+  return { ...publicData, ...(privateData || {}) };
+};
+
+// Subscribe to all players in real-time (for the dashboard) — sadece herkese açık alanlar
 export const subscribeToPlayers = (callback: (players: PlayerData[]) => void) => {
   const q = query(collection(db, 'players'), orderBy('joinedAt', 'desc'));
   return onSnapshot(q, (snapshot) => {
@@ -134,4 +161,13 @@ export const subscribeToPlayers = (callback: (players: PlayerData[]) => void) =>
     });
     callback(players);
   });
+};
+
+/** Admin paneli: tüm oyuncuların gizli bilgileri (Firestore kuralları sadece adminlere izin verir). */
+export const subscribeToPlayersPrivate = (callback: (byUid: Record<string, PlayerPrivateData>) => void) => {
+  return onSnapshot(collection(db, PRIVATE_COLLECTION), (snapshot) => {
+    const byUid: Record<string, PlayerPrivateData> = {};
+    snapshot.forEach((d) => { byUid[d.id] = d.data() as PlayerPrivateData; });
+    callback(byUid);
+  }, (err) => console.error('Gizli oyuncu bilgileri okunamadı:', err));
 };

@@ -1,0 +1,98 @@
+rules_version = '2';
+// İYTE Yeraltı Satranç — Firestore güvenlik kuralları (proje: iyte-satranc-ieee)
+// Yayınlama: firebase deploy --only firestore:rules   (veya Firebase konsolu → Firestore → Rules)
+// ÖNEMLİ: Yayınlamadan önce scripts/migrate-private-player-data.mjs ile mevcut kişisel veriler taşınmalı.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // Admin: e-posta listede VE doğrulanmış olmalı (başkasının adresiyle açılmış hesap admin olamaz).
+    // Liste .env'deki VITE_ADMIN_EMAILS ile aynı tutulmalı.
+    function isAdmin() {
+      return signedIn() && request.auth.token.email_verified == true &&
+        request.auth.token.email in [
+          'alikemaltopak@gmail.com',
+          'aliertoy@std.iyte.edu.tr',
+          'keremkasikci2005@gmail.com'
+        ];
+    }
+
+    function changedOnly(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    function validCodename(c) { return c is string && c.size() >= 3 && c.size() <= 15; }
+    function validArchetype(a) {
+      return a in ['CENTER CONTROL', 'DEVELOPMENT', 'KING SAFETY', 'PAWN STRUCTURE', 'OPEN FILE CONTROL',
+                   'TACTICS', 'COORDINATION', 'SPACE ADVANTAGE', 'PLAN MAKING'];
+    }
+    function validStudentId(s) { return s is string && s.matches('^[0-9]{9}$'); }
+
+    // Kayıt son tarihi: 6 Haziran 2026 23:59:59 TSİ (src/utils/date.ts ile aynı)
+    function registrationOpen() { return request.time < timestamp.date(2026, 6, 6) + duration.value(20 * 3600 + 59 * 60 + 59, 's'); }
+
+    // HERKESE AÇIK OYUNCU KARTI — e-posta ve öğrenci no burada TUTULMAZ
+    match /players/{uid} {
+      allow read: if true;
+      allow create: if isAdmin() || (signedIn() && request.auth.uid == uid && registrationOpen()
+        && request.resource.data.keys().hasOnly(['uid', 'codename', 'archetype', 'joinedAt', 'status'])
+        && request.resource.data.uid == uid
+        && request.resource.data.status == 'registered'
+        && request.resource.data.joinedAt == request.time
+        && validCodename(request.resource.data.codename)
+        && validArchetype(request.resource.data.archetype));
+      // Oyuncu sadece kod adını ve arketipini değiştirebilir; skor, durum vb. sadece admin
+      allow update: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && changedOnly(['codename', 'archetype'])
+        && validCodename(request.resource.data.codename)
+        && validArchetype(request.resource.data.archetype));
+      allow delete: if isAdmin();
+    }
+
+    // GİZLİ KİŞİSEL BİLGİLER — sadece sahibi ve adminler
+    match /players_private/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isAdmin() || (signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['email', 'studentId'])
+        && request.resource.data.email == request.auth.token.email
+        && validStudentId(request.resource.data.studentId)
+        && getAfter(/databases/$(database)/documents/student_ids/$(request.resource.data.studentId)).data.uid == uid);
+      allow update, delete: if isAdmin(); // öğrenci no değiştirilemez
+    }
+
+    // ÖĞRENCİ NO REZERVASYONU — numara başına tek belge; liste alınamaz
+    match /student_ids/{studentId} {
+      allow get: if signedIn();
+      allow list: if isAdmin();
+      allow create: if isAdmin() || (signedIn() && validStudentId(studentId)
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/players_private/$(request.auth.uid)).data.studentId == studentId);
+      allow update, delete: if isAdmin();
+    }
+
+    // TURNUVA ŞEMASI — herkes izler, sadece admin değiştirir
+    match /tournament/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // MAÇLAR — oyuncu sadece kendi renginin "maça girdi" işaretini koyabilir
+    match /matches/{matchId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == resource.data.whitePlayerId
+            && changedOnly(['whiteJoined']) && request.resource.data.whiteJoined == true)
+        || (signedIn() && request.auth.uid == resource.data.blackPlayerId
+            && changedOnly(['blackJoined']) && request.resource.data.blackJoined == true);
+    }
+
+    // KİŞİYE ÖZEL LICHESS LİNKLERİ — sadece ilgili oyuncu okur, sadece admin yazar
+    match /player_matches/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+  }
+}

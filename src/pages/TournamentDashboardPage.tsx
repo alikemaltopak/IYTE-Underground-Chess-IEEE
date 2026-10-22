@@ -13,6 +13,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 import { TournamentBracket, calculateStandings } from '../components/TournamentBracket';
+import { isAdminUser } from '../utils/admin';
 
 // Archetype icon & color mapping — mirrors CharacterCreationPage
 const ARCHETYPE_MAP: Record<string, { icon: LucideIcon; color: string }> = {
@@ -48,9 +49,7 @@ export const TournamentDashboardPage = ({ onBack, view, setView }: { onBack: () 
     };
   }, []);
 
-  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
-  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
-  const isUserAdmin = !!(user?.email && adminEmails.includes(user.email));
+  const isUserAdmin = isAdminUser(user);
 
   const getPlayerName = (uid: string) => {
     const p = players.find(p => p.uid === uid);
