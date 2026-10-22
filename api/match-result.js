@@ -1,17 +1,18 @@
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { applyCors } from './_lib/auth.js';
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+// Lichess oyun kimlikleri 8 (oyun) veya 12 (oyuncuya özel) karakterdir; başka bir şeyin URL'ye eklenmesine izin verme.
+const LICHESS_ID = /^[A-Za-z0-9]{8}([A-Za-z0-9]{4})?$/;
+
+export default async function handler(req, res) {
+  if (applyCors(req, res, 'GET')) return;
 
   const { matchId, full } = req.query;
 
   if (!matchId) {
     return res.status(400).json({ success: false, reason: 'matchId gerekli.' });
+  }
+  if (!LICHESS_ID.test(String(matchId))) {
+    return res.status(400).json({ success: false, reason: 'Geçersiz matchId.' });
   }
 
   try {
@@ -37,6 +38,6 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("Fetch Result Error:", error);
-    res.status(500).json({ success: false, reason: "Sunucu Hatası: " + error.message });
+    res.status(500).json({ success: false, reason: "Sunucu Hatası" });
   }
 }

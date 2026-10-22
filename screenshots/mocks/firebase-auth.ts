@@ -1,6 +1,6 @@
 // Ekran görüntüsü modu: ?user=0 ise oturum kapalı, aksi halde örnek oyuncu oturum açmış sayılır.
 const loggedIn = new URLSearchParams(location.search).get('user') !== '0';
-export const demoUser = { uid: 'p1', email: 'neon.raven@std.iyte.edu.tr', displayName: 'Neon Raven', photoURL: null };
+export const demoUser = { uid: 'p1', email: 'neon_raven@std.iyte.edu.tr', emailVerified: true, displayName: 'Neon Raven', photoURL: null, getIdToken: async () => 'demo' };
 
 export const getAuth = () => ({ currentUser: loggedIn ? demoUser : null });
 export class GoogleAuthProvider {}

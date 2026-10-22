@@ -20,6 +20,7 @@ import { checkRegistrationClosed } from '../utils/date';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../context/AuthContext';
+import { isAdminUser } from '../utils/admin';
 
 
 const Hero = ({ 
@@ -404,9 +405,7 @@ export const HomePage = ({ view, setView }: { view: string, setView: (v: any) =>
     return p?.codename || uid;
   };
 
-  const adminEmailsString = import.meta.env.VITE_ADMIN_EMAILS || 'alikemaltopak@gmail.com';
-  const adminEmails = adminEmailsString.split(',').map((e: string) => e.trim());
-  const isUserAdmin = !!(user?.email && adminEmails.includes(user.email));
+  const isUserAdmin = isAdminUser(user);
 
   return (
     <div className="min-h-screen selection:bg-primary selection:text-on-primary">

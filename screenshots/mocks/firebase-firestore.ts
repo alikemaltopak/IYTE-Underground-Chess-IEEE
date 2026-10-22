@@ -40,3 +40,4 @@ export class Timestamp {
   toDate() { return new Date(this.seconds * 1000); }
   toMillis() { return this.seconds * 1000; }
 }
+export const writeBatch = () => ({ set() {}, update() {}, delete() {}, commit: async () => {} });

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, Timestamp, collection, getDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase';
+import { authFetch } from '../utils/api';
 import { Trophy, Swords, Calendar, Clock, Users, Shuffle, Trash2, Crown, Medal, Loader2, Play, Radio, X, ExternalLink, AlertTriangle, Hourglass } from 'lucide-react';
 
 import {
@@ -204,7 +205,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
         if (match.status !== 'pending') continue;
 
         // Lichess maç oluştur
-        const res = await fetch('/api/create-match', { method: 'POST' });
+        const res = await authFetch('/api/create-match', { method: 'POST' });
         const data = await res.json();
         if (!data.success) { alert(`Maç oluşturulamadı: ${data.reason}`); continue; }
 
@@ -245,7 +246,8 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
 
   // === OTOMATİK SONUÇ KONTROL (30 saniyede bir) ===
   useEffect(() => {
-    if (!tournament || tournament.status === 'completed') {
+    // Sonuçları Firestore'a sadece adminler yazabilir; diğer ziyaretçiler canlı veriyi Firestore'dan izler
+    if (!isAdmin || !tournament || tournament.status === 'completed') {
       if (pollRef.current) clearInterval(pollRef.current);
       setPolling(false);
       return;
@@ -397,7 +399,7 @@ export const TournamentBracket: React.FC<TournamentBracketProps> = ({ players, g
     pollRef.current = setInterval(pollResults, 30000);
 
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [tournament]);
+  }, [tournament, isAdmin]);
 
   // Maç sonucunu kaydet
   const setMatchResult = async (roundIndex: number, matchIndex: number, winnerId: string) => {

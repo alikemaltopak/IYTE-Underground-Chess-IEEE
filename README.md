@@ -229,13 +229,14 @@ Turnuva mantığı (format seçimi, eşleştirme, puan tablosu, eleme, Lichess s
 
 ### Son çalıştırma sonucu
 
-> 21 Ekim 2026 · Node.js 22 · Vitest 3.2 — **4 dosya, 87 test, 87 başarılı ✅, 0 başarısız**
+> 22 Ekim 2026 · Node.js 22 · Vitest 3.2 — **5 dosya, 97 test, 97 başarılı ✅, 0 başarısız** (+ emülatörde 16 kural testi)
 
 | Test dosyası | Test | Sonuç | Doğrulanan davranış |
 |---|:-:|:-:|---|
 | `tests/engine.test.ts` | 62 | ✅ | Oyuncu sayısına göre format; Round Robin'de her ikilinin tam bir kez karşılaşması; puanlama (1 / ½ / 0, bay = 1) ve sıralama; Swiss tur sayısı, tekrar eşleşme olmaması, aynı oyuncuya ikinci bay verilmemesi; tek/çift eleme turnuvalarının tek şampiyonla bitmesi, büyük final ve rövanş, birleşme turu; Hybrid çeyrek final tohumlaması (1–8, 4–5, 2–7, 3–6) ve 7 turda bitiş; eleme kuralları; Lichess sonuç eşlemesi; hükmen mağlubiyet kararı |
-| `tests/api.test.ts` | 14 | ✅ | `/api/create-match` 10+5 Lichess maçı ve beyaz/siyah linkleri, hata durumları; `/api/match-result` sonuç, beraberlik, henüz başlamamış maç (404 → `created`); `/api/verify-codename` Gemini onayı/reddi, JSON ayıklama, hata durumunda güvenli ret, yerel ön kontroller, eksik API anahtarı |
-| `tests/playerService.test.ts` | 6 | ✅ | Kayıt `registered` durumunda, öğrenci numarası ve kod adı benzersizliği (büyük/küçük harf duyarsız), öğrenci numarasının değiştirilememesi, profil güncelleme |
+| `tests/api.test.ts` | 20 | ✅ | `/api/create-match` 10+5 Lichess maçı ve beyaz/siyah linkleri, hata durumları; `/api/match-result` sonuç, beraberlik, henüz başlamamış maç (404 → `created`); `/api/verify-codename` Gemini onayı/reddi, JSON ayıklama, hata durumunda güvenli ret, yerel ön kontroller, eksik API anahtarı; jetonsuz/yetkisiz isteklerin reddi, CORS, geçersiz maç kimliği, 15 karakter sınırı, hata ayrıntısının sızdırılmaması |
+| `tests/playerService.test.ts` | 7 | ✅ | E-posta ve öğrenci no'nun herkese açık kartta tutulmaması, kayıt `registered` durumunda, öğrenci numarası ve kod adı benzersizliği (büyük/küçük harf duyarsız), öğrenci numarasının değiştirilememesi, profil güncelleme |
+| `tests/admin.test.ts` | 3 | ✅ | Admin sayılmak için e-postanın listede ve doğrulanmış olması |
 | `tests/date.test.ts` | 5 | ✅ | Kayıt kapanışı (6 Haziran 2026 23:59:59 TSİ, saat diliminden bağımsız; turnuva başlayınca kapalı), maç son giriş zamanının her formatta güvenle okunması |
 
 ### Testlerle bulunan ve düzeltilen hatalar
@@ -248,12 +249,55 @@ Turnuva mantığı (format seçimi, eşleştirme, puan tablosu, eleme, Lichess s
 | 4 | Canlıdaki (Vercel) kod adı doğrulamasında, yerel sunucudaki "en az 3 karakter / sadece rakam olamaz" ön kontrolleri yoktu. | ✅ Düzeltildi |
 | 5 | **Hybrid ve tek elemede beraberlik:** eleme turunda berabere biten maçta iki oyuncu da elenmiyor. Hybrid'de bu durumda bir sonraki turda rakibi boş (`null`) bir maç oluşuyor. Beraberlikte ne olacağına (rövanş, Armageddon vb.) karar verilmesi gerekiyor. | ⚠️ Açık — kural kararı gerekiyor |
 | 6 | `TournamentBracket.tsx` içinde, admin paneli her açıldığında 5. turdaki belirli bir oyuncu kimliğini başka bir kimlikle değiştiren tek seferlik bir düzeltme kodu duruyor. Yeni bir turnuvada bu kimlikler 5. turda yer alırsa eşleşmeyi sessizce değiştirir. | ⚠️ Açık — işi bittiyse kaldırılmalı |
-| 7 | Repoda `firestore.rules` yok; admin yetkisi yalnızca arayüzde (`VITE_ADMIN_EMAILS`) kontrol ediliyor. Firebase konsolundaki kuralların `tournament`, `matches` ve diğer oyuncuların `players` kayıtlarına yazmayı adminlerle sınırladığından emin olun. | ⚠️ Kontrol edilmeli |
-| 8 | Arayüz kod adı için "en fazla 15 karakter" diyor, yapay zekâ istemi 20 diyor; üst sınır hiçbir yerde kod ile uygulanmıyor. | ⚠️ Açık |
+| 7 | Güvenlik kuralları repoda yoktu; e-posta ve öğrenci numaraları herkese açıktı, oyuncular kendi skorlarını ve maç kayıtlarını değiştirebiliyordu. | ✅ Düzeltildi — bkz. [Güvenlik ve Kişisel Veriler](#-güvenlik-ve-kişisel-veriler) |
+| 8 | Arayüz kod adı için "en fazla 15 karakter" diyor, yapay zekâ istemi 20 diyordu; üst sınır kodla uygulanmıyordu. | ✅ Düzeltildi — sunucuda ve kurallarda 15 |
 
 ### Test kapsamı dışında kalanlar
 
 Gerçek Firebase girişi, Firestore güvenlik kuralları, canlı Lichess/Gemini yanıtları ve 30 saniyelik otomatik sonuç kontrolünün tarayıcıda çalışması taklitlerle değil, gerçek ortamda manuel olarak doğrulanmalıdır.
+
+---
+
+## 🔐 Güvenlik ve Kişisel Veriler
+
+### Veriler nerede, kim görebilir?
+
+| Koleksiyon | İçerik | Okuma | Yazma |
+|---|---|---|---|
+| `players/{uid}` | Kod adı, arketip, durum, skor (**e-posta ve öğrenci no yok**) | Herkes | Oyuncu: sadece kendi kod adı/arketipi (kayıt süresi içinde oluşturma) · Admin: hepsi |
+| `players_private/{uid}` | E-posta, öğrenci no | Sadece sahibi ve adminler | Oyuncu: sadece kayıtta bir kez · Admin |
+| `student_ids/{no}` | Öğrenci no → uid (benzersizlik) | Tek numara sorgusu (giriş yapmış kullanıcı), liste: admin | Kayıtta bir kez · Admin |
+| `tournament/current` | Turnuva şeması | Herkes | Sadece admin |
+| `matches/{id}` | Maç durumu, oyuncu kimlikleri | Herkes | Oyuncu: sadece kendi renginin "maça girdi" işareti · Admin: hepsi |
+| `player_matches/{uid}` | Kişiye özel Lichess linki | Sadece sahibi ve admin | Sadece admin |
+
+- **Admin** = e-postası listede **ve doğrulanmış** kullanıcı. Admin e-postasıyla şifreli hesap açan biri admin olamaz. Liste üç yerde aynı tutulmalı: `firestore.rules`, `VITE_ADMIN_EMAILS` (arayüz), `ADMIN_EMAILS` (sunucu; boşsa `VITE_ADMIN_EMAILS`).
+- **Sunucu fonksiyonları:** `/api/verify-codename` sadece oturum açmış kullanıcılara, `/api/create-match` sadece adminlere açıktır (Firebase kimlik jetonu doğrulanır). `/api/match-result` sadece geçerli Lichess oyun kimliği kabul eder. CORS varsayılan olarak kapalıdır, gerekirse `ALLOWED_ORIGINS` ile açılır.
+- **Kod adı:** 3–15 karakter sunucuda uygulanır; kod adı yapay zekâya "veri" olarak verilir, içindeki talimatlar dikkate alınmaz.
+- **Maç sonuçları ve hükmen kararlar** sadece admin tarayıcısından yazılır: admin turnuva sayfasını açık tuttuğunda 30 saniyede bir Lichess kontrol edilir.
+
+### Kuralları yayınlama (sıra önemli)
+
+1. Bu sürümü yayınlayın (Vercel). Vercel ortam değişkenlerinde `VITE_FIREBASE_PROJECT_ID` ve `VITE_ADMIN_EMAILS` bulunmalı.
+2. Mevcut e-posta ve öğrenci numaralarını gizli koleksiyona taşıyın (önce rapor, sonra uygulama):
+   ```bash
+   GOOGLE_APPLICATION_CREDENTIALS=servis-hesabi.json FIREBASE_PROJECT_ID=iyte-satranc-ieee node scripts/migrate-private-player-data.mjs
+   GOOGLE_APPLICATION_CREDENTIALS=servis-hesabi.json FIREBASE_PROJECT_ID=iyte-satranc-ieee node scripts/migrate-private-player-data.mjs --apply
+   ```
+3. `firestore.rules` dosyasını yayınlayın: Firebase konsolu → Firestore → Rules (dosyanın içeriğini yapıştırın) veya `firebase deploy --only firestore:rules`.
+
+> Yeni bir turnuva dönemi için kayıt son tarihi iki yerde güncellenmelidir: `src/utils/date.ts` ve `firestore.rules` (`registrationOpen`).
+> `scratch/` altındaki oturumsuz istemci betikleri yeni kurallarla çalışmaz; bakım işleri için firebase-admin kullanan betikler tercih edilmelidir.
+
+### Kural testleri
+
+Kurallar Firebase Emulator üzerinde 16 senaryoyla test edilir (Java gerekir):
+
+```bash
+npm run test:rules
+```
+
+> Son çalıştırma (22 Ekim 2026): **16/16 başarılı ✅**. Aynı testler önceki canlı kurallarla çalıştırıldığında 8'i başarısız oluyordu. Bunlar arasında doğrulanmamış admin e-postasının admin sayılması, oyuncunun kendi skorunu/durumunu değiştirebilmesi, herhangi bir maç belgesinin değiştirilebilmesi ve oyuncunun kendi Lichess linkini yazabilmesi var.
 
 ---
 
@@ -282,6 +326,9 @@ Vercel'e yüklerken, `Settings > Environment Variables` kısmından tüm `.env` 
 │   ├── firebase.ts         # Firebase Başlatma Konfigürasyonu
 │   └── index.css           # Global Cyberpunk Tasarım Tokenları
 ├── tests/                  # Vitest testleri (npm test)
+├── rules-tests/            # Firestore kural testleri (npm run test:rules, emülatör)
+├── scripts/                # Bakım betikleri (kişisel veri taşıma)
+├── firestore.rules         # Firestore güvenlik kuralları
 ├── server.js               # Lokal Geliştirme İçin Express Backend
 ├── vercel.json             # Vercel Dağıtım Kuralları
 └── vite.config.ts          # Vite ve Proxy Ayarları

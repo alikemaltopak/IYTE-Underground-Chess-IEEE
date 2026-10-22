@@ -11,6 +11,7 @@ import { savePlayer, getPlayer, PlayerData } from '../services/playerService';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { checkRegistrationClosed } from '../utils/date';
+import { authFetch } from '../utils/api';
 
 
 export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView }: { onBack: () => void, onEnterTournament: () => void, view: any, setView: (v: any) => void }) => {
@@ -134,7 +135,7 @@ export const CharacterCreationPage = ({ onBack, onEnterTournament, view, setView
     setCodenameStatus('scanning');
     
     try {
-      const response = await fetch('/api/verify-codename', {
+      const response = await authFetch('/api/verify-codename', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ codename })

@@ -1,16 +1,15 @@
-export default async function handler(req, res) {
-  // CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+import { applyCors, requireAdmin } from './_lib/auth.js';
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+// Lichess'te 10+5 açık meydan okuma oluşturur. Sadece adminler (turu başlatırken) çağırabilir.
+export default async function handler(req, res) {
+  if (applyCors(req, res, 'POST')) return;
 
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, reason: 'Sadece POST desteklenir.' });
   }
+
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
 
   try {
     const response = await fetch('https://lichess.org/api/challenge/open', {
@@ -35,10 +34,10 @@ export default async function handler(req, res) {
       });
     } else {
       console.error("[LICHESS API ERROR]", data);
-      res.status(400).json({ success: false, reason: "Lichess Maç Oluşturamadı", details: data });
+      res.status(400).json({ success: false, reason: "Lichess Maç Oluşturamadı" });
     }
   } catch (error) {
     console.error("Match Creation Error:", error);
-    res.status(500).json({ success: false, reason: "Sunucu Hatası: " + error.message });
+    res.status(500).json({ success: false, reason: "Sunucu Hatası" });
   }
 }

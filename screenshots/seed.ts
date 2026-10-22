@@ -11,7 +11,7 @@ export function seed() {
   NAMES.forEach(([codename, archetype], i) => {
     const uid = `p${i + 1}`;
     players[uid] = {
-      uid, codename, archetype, studentId: `2902010${10 + i}`, email: `${codename.toLowerCase()}@std.iyte.edu.tr`,
+      uid, codename, archetype,
       status: 'active', joinedAt: { seconds: 1780000000 - i * 3600 }, wins: 0, losses: 0, draws: 0,
     };
   });
@@ -49,8 +49,12 @@ export function seed() {
     };
   });
 
+  const players_private: Record<string, any> = {};
+  ids.forEach((uid, i) => { players_private[uid] = { studentId: `2902010${10 + i}`, email: `${players[uid].codename.toLowerCase()}@std.iyte.edu.tr` }; });
+
   return {
     players,
+    players_private,
     tournament: { current: { format: 'round_robin', status: 'active', rounds, playerIds: ids, createdAt: { seconds: 1780000000 } } },
     matches,
     player_matches: { p1: { upcomingMatch: `https://lichess.org/${myMatch.lichessMatchId}?color=${color}`, matchId: myMatch.lichessMatchId, matchColor: color } },
