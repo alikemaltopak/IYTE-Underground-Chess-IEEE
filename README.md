@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="public/hero-bg.jpg" alt="Cyberpunk Chess" width="100%" />
+  <img src="docs/screenshots/home.png" alt="İYTE Yeraltı Satranç Turnuvası ana sayfa" width="100%" />
 
   # ⚡️ İYTE Yeraltı Satranç Turnuvası (V2) ⚡️
 
@@ -23,6 +23,129 @@ Geleneksel satranç atmosferini modern, karanlık ve fütüristik bir "Undergrou
 - **🕰️ Akıllı Bildirim Sistemi:** Eşleşmesi belli olan oyuncuların profil sayfasına, maça tam 48 saat kala "SİSTEM MESAJI" olarak yaklaşan müsabaka detayları (rakip bilgileri, saat, tarih) düşer.
 - **🛡️ Admin Kontrol Paneli:** Güvenli `.env` yetkilendirmesi sayesinde sadece sistem yöneticileri yeni turlar oluşturabilir, eşleşmeleri başlatabilir ve turnuva ağacını yönetebilir.
 - **✨ Premium Cyberpunk Arayüz:** Neon ışıklar, glitch efektleri, scanline animasyonları, koyu mod tasarımı ve Framer Motion ile güçlendirilmiş akıcı mikro animasyonlar.
+
+---
+
+## 📸 Ekranlar
+
+<p align="center">
+  <img src="docs/screenshots/login-mobile.png" width="135" alt="Giriş" />
+  <img src="docs/screenshots/home-mobile.png" width="135" alt="Ana sayfa" />
+  <img src="docs/screenshots/character-mobile.png" width="135" alt="Karakter oluşturma" />
+  <img src="docs/screenshots/dashboard-mobile.png" width="135" alt="Turnuva paneli" />
+  <img src="docs/screenshots/profile-mobile.png" width="135" alt="Profil" />
+  <img src="docs/screenshots/rules-mobile.png" width="135" alt="Kurallar" />
+</p>
+
+| Ekran | Ne yapar? |
+|---|---|
+| <img src="docs/screenshots/login.png" width="420" /><br/>**Giriş** | E-posta/şifre veya Google ile Firebase Authentication girişi. Kayıt süresi dolduysa (6 Haziran 2026 23:59, TSİ) veya turnuva başladıysa yeni kayıt alınmadığı uyarısı gösterilir. |
+| <img src="docs/screenshots/character.png" width="420" /><br/>**Karakter oluşturma** | 9 haneli öğrenci numarası (bir kez girilir, değiştirilemez), yapay zekâ ile denetlenen **kod adı** ve oyun **arketipi** seçilir. Aynı öğrenci numarası veya kod adı ikinci kez kullanılamaz. |
+| <img src="docs/screenshots/dashboard.png" width="420" /><br/>**Turnuva paneli** | Katılımcı sayısı, başlangıç tarihi, format (10+5 Rapid, Lichess) ve oyuncu sayısına göre otomatik seçilen turnuva sistemi. |
+| <img src="docs/screenshots/bracket.png" width="420" /><br/>**Puan durumu ve tur eşleşmeleri** | Canlı puan tablosu (G=1, B=½, M=0) ve her turun eşleşmeleri. Admin turu başlatınca her maç için Lichess linki üretilir; sonuçlar 30 saniyede bir otomatik çekilir. |
+| <img src="docs/screenshots/profile.png" width="420" /><br/>**Profil** | Oyuncunun kod adı, arketipi, öğrenci bilgileri ve yaklaşan müsabakaları (tarih, saat, rakip). Tur başladığında kişiye özel Lichess linki sayfanın üstündeki maç banner'ında belirir. |
+| <img src="docs/screenshots/rules.png" width="420" /><br/>**Sistem protokolleri** | Turnuva kuralları: anonim kimlik, 10+5 süre, 15 dk katılım süresi (gelmeyen hükmen mağlup), adil oyun ve disiplin kuralları. |
+
+> Görseller, Firebase yerine örnek turnuva verisi kullanan **ekran görüntüsü modu** ile uygulamanın gerçek sayfalarından üretilir: `npm run screenshots` → `docs/screenshots/`.
+
+---
+
+## ⚙️ Nasıl Çalışır?
+
+### Genel mimari
+
+```mermaid
+flowchart LR
+    U([♟️ Oyuncu / Admin]) --> FE[⚛️ React + Vite arayüz]
+    FE <-- "giriş (e-posta / Google)" --> AUTH[🔐 Firebase Auth]
+    FE <-- "players · tournament · matches · player_matches (canlı)" --> FS[(🔥 Firestore)]
+    FE -- "/api/verify-codename" --> API[☁️ Vercel Functions<br/>yerelde server.js]
+    FE -- "/api/create-match · /api/match-result" --> API
+    API -- "kod adı denetimi" --> GEM[🤖 Google Gemini]
+    API -- "açık meydan okuma · oyun sonucu" --> LI[♞ Lichess API]
+```
+
+API anahtarları (Gemini) yalnızca sunucu tarafında (`api/` ve `server.js`) kullanılır; tarayıcıya gönderilmez.
+
+### Kayıt akışı
+
+```mermaid
+sequenceDiagram
+    actor O as Oyuncu
+    participant A as Arayüz
+    participant G as /api/verify-codename
+    participant AI as Gemini
+    participant F as Firestore
+
+    O->>A: Giriş (Firebase Auth)
+    O->>A: Öğrenci no (9 hane) + kod adı + arketip
+    A->>G: kod adı
+    alt < 3 karakter veya sadece rakam
+        G-->>A: Reddedildi (yapay zekâya sorulmaz)
+    else
+        G->>AI: Gerçek isim / konum / küfür / leetspeak var mı?
+        AI-->>G: {"valid": true | false, "reason": "..."}
+        G-->>A: Onay veya ret gerekçesi
+    end
+    A->>F: Öğrenci no ve kod adı benzersiz mi?
+    A->>F: players/{uid} = {codename, archetype, status: "registered"}
+```
+
+### Turnuva formatı (oyuncu sayısına göre otomatik)
+
+```mermaid
+flowchart TD
+    N{Kayıtlı oyuncu sayısı} -->|4 – 10| RR[Round Robin<br/>herkes herkese]
+    N -->|11 – 24| SW[Swiss<br/>≤16 oyuncu: 4 tur · >16: 5 tur]
+    N -->|25 – 35| DE[Double Elimination<br/>2 mağlubiyette elenir]
+    N -->|36 – 50| HY[Hybrid<br/>4 tur Swiss → ilk 8 eleme]
+    N -->|51+| SE[Single Elimination<br/>1 mağlubiyette elenir]
+```
+
+- **Puanlama:** galibiyet 1, beraberlik ½, mağlubiyet 0; bay (BYE) 1 puan. Sıralama puana, eşitlikte galibiyet sayısına göre.
+- **Swiss:** her tur puan sırasına göre, daha önce karşılaşmamış en yakın rakiple eşleşilir; tek sayıda oyuncuda bay, daha önce bay almamış en alttaki oyuncuya verilir.
+- **Double Elimination:** kazananlar ve kaybedenler grubu ayrı eşleşir; büyük finali kaybedenler grubundan gelen kazanırsa rövanş (reset) oynanır. 4. turdan sonra (admin panelindeki seçenek kapatılmazsa) iki grup tek havuzda birleştirilir ve kalan oyuncular rastgele eşleşir.
+- **Hybrid:** 4 Swiss turundan sonra ilk 8, çeyrek finalde 1–8, 4–5, 2–7, 3–6 eşleşir; ardından yarı final ve final (toplam 7 tur).
+
+### Bir maçın yaşam döngüsü
+
+```mermaid
+sequenceDiagram
+    actor AD as Admin
+    participant P as Turnuva paneli
+    participant API as /api
+    participant L as Lichess
+    participant F as Firestore
+    actor O as Oyuncular
+
+    AD->>P: "Turu başlat"
+    loop Her eşleşme
+        P->>API: POST /api/create-match
+        API->>L: Açık meydan okuma (10+5)
+        L-->>API: oyun id + beyaz/siyah linkleri
+        P->>F: player_matches/{oyuncu} = kişiye özel link
+        P->>F: matches/{id} = {beyaz, siyah, son giriş: +15 dk}
+    end
+    F-->>O: Maç banner'ında kişiye özel "Maça gir" linki
+    loop Her 30 saniye
+        P->>API: GET /api/match-result?matchId=…
+        API->>L: oyun durumu
+        alt mat / terk / süre / beraberlik
+            P->>F: sonuç, puan tablosu, eleme durumu
+        else 15 dk doldu, hamle yok
+            P->>F: gelen oyuncu hükmen kazanır (ikisi de gelmezse beraberlik)
+        end
+    end
+```
+
+### Firestore veri yapısı
+
+```
+players/{uid}             codename (BÜYÜK HARF), studentId, archetype, email, status (registered|active|eliminated), wins, losses, draws
+tournament/current        format, status (active|completed), playerIds[], rounds[{roundNumber, date, time, started, matches[]}], mergeRound?
+matches/{lichessId}       whitePlayerId, blackPlayerId, status, deadline, tournamentRound, winner, result
+player_matches/{uid}      upcomingMatch (kişiye özel Lichess linki), matchId, matchColor
+```
 
 ---
 
@@ -54,8 +177,8 @@ Geleneksel satranç atmosferini modern, karanlık ve fütüristik bir "Undergrou
 
 1. **Depoyu Klonlayın:**
    ```bash
-   git clone https://github.com/kullaniciadi/iyte-yeralti-satranc-v2.git
-   cd iyte-yeralti-satranc-v2
+   git clone https://github.com/alikemaltopak/IYTE-Underground-Chess-IEEE.git
+   cd IYTE-Underground-Chess-IEEE
    ```
 
 2. **Bağımlılıkları Yükleyin:**
@@ -64,7 +187,7 @@ Geleneksel satranç atmosferini modern, karanlık ve fütüristik bir "Undergrou
    ```
 
 3. **Çevresel Değişkenleri Ayarlayın:**
-   Proje ana dizininde `.env` (veya `.env.local`) dosyası oluşturun ve aşağıdaki değerleri kendi projenize göre doldurun:
+   `.env.example` dosyasını `.env` olarak kopyalayıp değerleri kendi projenize göre doldurun. `.env*` dosyaları `.gitignore`'dadır, git'e gönderilmez:
    ```env
    # Firebase Configuration
    VITE_FIREBASE_API_KEY=your_api_key
@@ -94,6 +217,46 @@ Geleneksel satranç atmosferini modern, karanlık ve fütüristik bir "Undergrou
 
 ---
 
+## 🧪 Testler ve Doğrulama Sonuçları
+
+Uygulamanın vaat ettiği davranışları doğrulayan otomatik testler [Vitest](https://vitest.dev) ile yazılmıştır. Firebase, Lichess ve Gemini taklit edilir; gerçek hesap veya API anahtarı gerekmez.
+
+```bash
+npm test
+```
+
+Turnuva mantığı (format seçimi, eşleştirme, puan tablosu, eleme, Lichess sonucu ve hükmen kararı) test edilebilmesi için `src/tournament/engine.ts` dosyasına taşınmıştır; `TournamentBracket` bileşeni bu modülü kullanır.
+
+### Son çalıştırma sonucu
+
+> 21 Ekim 2026 · Node.js 22 · Vitest 3.2 — **4 dosya, 87 test, 87 başarılı ✅, 0 başarısız**
+
+| Test dosyası | Test | Sonuç | Doğrulanan davranış |
+|---|:-:|:-:|---|
+| `tests/engine.test.ts` | 62 | ✅ | Oyuncu sayısına göre format; Round Robin'de her ikilinin tam bir kez karşılaşması; puanlama (1 / ½ / 0, bay = 1) ve sıralama; Swiss tur sayısı, tekrar eşleşme olmaması, aynı oyuncuya ikinci bay verilmemesi; tek/çift eleme turnuvalarının tek şampiyonla bitmesi, büyük final ve rövanş, birleşme turu; Hybrid çeyrek final tohumlaması (1–8, 4–5, 2–7, 3–6) ve 7 turda bitiş; eleme kuralları; Lichess sonuç eşlemesi; hükmen mağlubiyet kararı |
+| `tests/api.test.ts` | 14 | ✅ | `/api/create-match` 10+5 Lichess maçı ve beyaz/siyah linkleri, hata durumları; `/api/match-result` sonuç, beraberlik, henüz başlamamış maç (404 → `created`); `/api/verify-codename` Gemini onayı/reddi, JSON ayıklama, hata durumunda güvenli ret, yerel ön kontroller, eksik API anahtarı |
+| `tests/playerService.test.ts` | 6 | ✅ | Kayıt `registered` durumunda, öğrenci numarası ve kod adı benzersizliği (büyük/küçük harf duyarsız), öğrenci numarasının değiştirilememesi, profil güncelleme |
+| `tests/date.test.ts` | 5 | ✅ | Kayıt kapanışı (6 Haziran 2026 23:59:59 TSİ, saat diliminden bağımsız; turnuva başlayınca kapalı), maç son giriş zamanının her formatta güvenle okunması |
+
+### Testlerle bulunan ve düzeltilen hatalar
+
+| # | Bulgu | Durum |
+|---|---|---|
+| 1 | **Swiss'te aynı oyuncu iki kez bay alıyordu** (ör. 13 ve 23 oyunculu turnuvada). Bay geçmişi "hiç maçta olmayan oyuncu" diye aranıyordu, ama bay `BYE` rakipli bir maç olarak kaydediliyor. | ✅ Düzeltildi |
+| 2 | **Swiss'te kaçınılabilir tekrar eşleşme** (ör. 20 oyuncuda son tur iki oyuncuyu ikinci kez karşılaştırıyordu). Açgözlü eşleştirmeye, tekrarsız eşleştirmeyi arayan geri izlemeli bir adım eklendi; mümkün değilse eski davranış sürer. | ✅ Düzeltildi |
+| 3 | **Aynı kod adı ikinci kez alınabiliyordu:** benzersizlik kontrolü büyük harfli adı arıyor, kayıt ise yazıldığı gibi saklanıyordu. Kod adları artık büyük harfle kaydediliyor; kontrol eski kayıtları da buluyor. | ✅ Düzeltildi |
+| 4 | Canlıdaki (Vercel) kod adı doğrulamasında, yerel sunucudaki "en az 3 karakter / sadece rakam olamaz" ön kontrolleri yoktu. | ✅ Düzeltildi |
+| 5 | **Hybrid ve tek elemede beraberlik:** eleme turunda berabere biten maçta iki oyuncu da elenmiyor. Hybrid'de bu durumda bir sonraki turda rakibi boş (`null`) bir maç oluşuyor. Beraberlikte ne olacağına (rövanş, Armageddon vb.) karar verilmesi gerekiyor. | ⚠️ Açık — kural kararı gerekiyor |
+| 6 | `TournamentBracket.tsx` içinde, admin paneli her açıldığında 5. turdaki belirli bir oyuncu kimliğini başka bir kimlikle değiştiren tek seferlik bir düzeltme kodu duruyor. Yeni bir turnuvada bu kimlikler 5. turda yer alırsa eşleşmeyi sessizce değiştirir. | ⚠️ Açık — işi bittiyse kaldırılmalı |
+| 7 | Repoda `firestore.rules` yok; admin yetkisi yalnızca arayüzde (`VITE_ADMIN_EMAILS`) kontrol ediliyor. Firebase konsolundaki kuralların `tournament`, `matches` ve diğer oyuncuların `players` kayıtlarına yazmayı adminlerle sınırladığından emin olun. | ⚠️ Kontrol edilmeli |
+| 8 | Arayüz kod adı için "en fazla 15 karakter" diyor, yapay zekâ istemi 20 diyor; üst sınır hiçbir yerde kod ile uygulanmıyor. | ⚠️ Açık |
+
+### Test kapsamı dışında kalanlar
+
+Gerçek Firebase girişi, Firestore güvenlik kuralları, canlı Lichess/Gemini yanıtları ve 30 saniyelik otomatik sonuç kontrolünün tarayıcıda çalışması taklitlerle değil, gerçek ortamda manuel olarak doğrulanmalıdır.
+
+---
+
 ## 🚀 Deployment (Vercel)
 
 Proje Vercel üzerinde tek tıkla çalışacak şekilde (`vercel.json` rewrite ayarları dahil) konfigüre edilmiştir. 
@@ -104,16 +267,21 @@ Vercel'e yüklerken, `Settings > Environment Variables` kısmından tüm `.env` 
 ## 📁 Proje Yapısı
 
 ```
-├── api/                    # Vercel Serverless Functions (Yapay Zeka vb.)
+├── api/                    # Vercel Serverless Functions (Gemini kod adı denetimi, Lichess maç/sonuç)
+├── docs/screenshots/       # README ekran görüntüleri
 ├── public/                 # Statik Varlıklar (Görseller, Arka Planlar)
+├── screenshots/            # Ekran görüntüsü modu (örnek veri + Firebase taklidi, npm run screenshots)
 ├── src/
-│   ├── components/         # Tekrar Kullanılabilir UI (Navbar, Footer)
+│   ├── components/         # Tekrar Kullanılabilir UI (Navbar, TournamentBracket, GlobalMatchBanner)
 │   ├── context/            # React Context (AuthContext)
 │   ├── pages/              # Ana Sayfalar (Dashboard, Profile, Rules vb.)
 │   ├── services/           # Firebase DB Servisleri (playerService, vb.)
+│   ├── tournament/         # Turnuva motoru: format, eşleştirme, puan tablosu, eleme kuralları
+│   ├── utils/              # Kayıt kapanışı ve tarih yardımcıları
 │   ├── App.tsx             # Ana Router / View Controller
 │   ├── firebase.ts         # Firebase Başlatma Konfigürasyonu
 │   └── index.css           # Global Cyberpunk Tasarım Tokenları
+├── tests/                  # Vitest testleri (npm test)
 ├── server.js               # Lokal Geliştirme İçin Express Backend
 ├── vercel.json             # Vercel Dağıtım Kuralları
 └── vite.config.ts          # Vite ve Proxy Ayarları

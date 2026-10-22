@@ -38,7 +38,9 @@ export const isStudentIdTaken = async (studentId: string): Promise<boolean> => {
 // Check if a codename is already used (excluding a specific uid)
 export const isCodenameTaken = async (codename: string, excludeUid?: string): Promise<boolean> => {
   const upperCodename = codename.toUpperCase();
-  const q = query(collection(db, 'players'), where('codename', '==', upperCodename));
+  // Yeni kayıtlar büyük harfle saklanır; eski kayıtlar yazıldığı gibi durabilir, ikisini de ara.
+  const variants = Array.from(new Set([codename, upperCodename]));
+  const q = query(collection(db, 'players'), where('codename', 'in', variants));
   const snapshot = await getDocs(q);
   if (excludeUid) {
     return snapshot.docs.some(doc => doc.id !== excludeUid);
@@ -78,7 +80,7 @@ export const savePlayer = async (
     const playerRef = doc(db, 'players', uid);
     await setDoc(playerRef, {
       uid,
-      codename: data.codename,
+      codename: data.codename.toUpperCase(),
       studentId: data.studentId,
       archetype: data.archetype,
       email: data.email,
@@ -95,7 +97,7 @@ export const savePlayer = async (
   }
 
   // Codename değiştirmişse kontrol et
-  if (existingPlayer.codename !== data.codename) {
+  if (existingPlayer.codename.toUpperCase() !== data.codename.toUpperCase()) {
     const codenameTaken = await isCodenameTaken(data.codename, uid);
     if (codenameTaken) {
       return { success: false, error: 'Bu kullanıcı adı zaten başka bir oyuncu tarafından kullanılıyor.' };
@@ -105,7 +107,7 @@ export const savePlayer = async (
   // Update işlemi
   const playerRef = doc(db, 'players', uid);
   await setDoc(playerRef, {
-    codename: data.codename,
+    codename: data.codename.toUpperCase(),
     archetype: data.archetype
   }, { merge: true });
 
